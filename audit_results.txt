@@ -1,0 +1,45 @@
+Source Name               | Type       | Articles | Images   | Status
+--------------------------------------------------------------------------------
+Africa Report             | scrape     | 0        | 0        | FAIL (Fetch)
+TechCabal                 | scrape     | ERROR    | -        | 'GenericScraper' obj
+SOS Medias Burundi        | scrape     | 0        | 0        | FAIL (Fetch)
+Burundi Eco               | scrape     | ERROR    | -        | 'GenericScraper' obj
+Radio Okapi               | scrape     | ERROR    | -        | 'GenericScraper' obj
+7sur7.cd                  | scrape     | ERROR    | -        | 'GenericScraper' obj
+Nation Africa             | scrape     | 0        | 0        | FAIL (Fetch)
+Standard Media            | scrape     | ERROR    | -        | 'GenericScraper' obj
+Tuko                      | scrape     | ERROR    | -        | 'GenericScraper' obj
+LeFaso.net                | scrape     | ERROR    | -        | 'GenericScraper' obj
+Maliweb                   | scrape     | ERROR    | -        | 'GenericScraper' obj
+Guinee7                   | scrape     | ERROR    | -        | 'GenericScraper' obj
+Vanguard                  | scrape     | 0        | 0        | FAIL (Fetch)
+TechPoint Africa          | scrape     | ERROR    | -        | 'GenericScraper' obj
+Pulse Nigeria             | scrape     | ERROR    | -        | 'GenericScraper' obj
+News24                    | scrape     | ERROR    | -        | 'GenericScraper' obj
+Daily Maverick            | scrape     | ERROR    | -        | 'GenericScraper' obj
+IT News Africa            | scrape     | ERROR    | -        | 'GenericScraper' obj
+MyJoyOnline               | scrape     | ERROR    | -        | 'GenericScraper' obj
+GhanaWeb                  | scrape     | ERROR    | -        | 'GenericScraper' obj
+Pulse Ghana               | scrape     | ERROR    | -        | 'GenericScraper' obj
+Dakaractu                 | scrape     | ERROR    | -        | 'GenericScraper' obj
+Journal du Cameroun       | scrape     | ERROR    | -        | 'GenericScraper' obj
+Le360                     | scrape     | ERROR    | -        | 'GenericScraper' obj
+Hespress FR               | scrape     | ERROR    | -        | 'GenericScraper' obj
+New Times Rwanda          | scrape     | ERROR    | -        | 'GenericScraper' obj
+Addis Standard            | scrape     | 0        | 0        | FAIL (Fetch)
+Abidjan.net               | scrape     | 5        | 5        | OK
+Seneweb                   | scrape     | 13       | 13       | OK
+IWACU                     | scrape     | 3        | 3        | OK
+Actualite.cd              | scrape     | 3        | 3        | OK
+Burkina 24                | scrape     | 15       | 15       | OK
+Guinee7                   | scrape     | ERROR    | -        | 'GenericScraper' obj
+NewsAPI                   | api        | ERROR    | -        | Can't instantiate ab
+GNews                     | API        | SKIP     | SKIP     | API Source
+Reddit                    | API        | SKIP     | SKIP     | API Source
+Google Trends             | API        | SKIP     | SKIP     | API Source
+Punch                     | scrape     | 10       | 10       | OK
+Jeune Afrique             | scrape     | 15       | 11       | OK
+Fratmat                   | scrape     | 6        | 6        | OK
+Maliactu                  | scrape     | 15       | 15       | OK
+RFI Afrique               | scrape     | 0        | 0        | FAIL (Fetch)
+AllAfrica                 | scrape     | 10       | 10       | OK
