@@ -46,7 +46,10 @@ class PostEngine:
                 log_info("No suitable content found")
                 return False
             
-            log_info(f"Selected: [{content.get('country', 'Unknown')}] {content.get('headline', '')[:50]}...")
+            country = content.get('country', 'Pan-African')
+            niche = content.get('niche', 'politics')
+            
+            log_info(f"Selected: [{country}] {content.get('headline', '')[:50]}...")
             
             # Determine output language
             output_language = suggested_language or schedule.get('target_language') or content.get('source_language', 'french')
@@ -57,8 +60,8 @@ class PostEngine:
                 headline=content.get('headline', ''),
                 summary=content.get('summary', ''),
                 output_language=output_language,
-                country=content.get('country', ''),
-                niche=content.get('niche', '')
+                country=country,
+                niche=niche
             )
             
             if not post_text:
@@ -68,8 +71,8 @@ class PostEngine:
             # Get image URL
             image_url = content.get('image_url', '')
             
-            # Post to Facebook
-            post_result = self.fb.post(post_text, image_url)
+            # Post to Facebook with country and niche for fallback images
+            post_result = self.fb.post(post_text, image_url, country=country, niche=niche)
             
             if post_result:
                 # Mark content as posted
@@ -80,8 +83,8 @@ class PostEngine:
                     content_id=content['id'],
                     post_text=post_text,
                     post_language=output_language,
-                    target_country=content.get('country', ''),
-                    niche=content.get('niche', ''),
+                    target_country=country,
+                    niche=niche,
                     image_used=image_url,
                     facebook_post_id=post_result
                 )

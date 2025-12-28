@@ -2,8 +2,8 @@ name: Post to Facebook
 
 on:
   schedule:
-    - cron: '5 * * * *'  # Every hour at :05
-  workflow_dispatch:  # Manual trigger
+    - cron: '5 * * * *'
+  workflow_dispatch:
 
 jobs:
   post:
@@ -21,8 +21,7 @@ jobs:
           cache: 'pip'
       
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
       
       - name: Run post
         env:
@@ -33,5 +32,6 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python main.py post
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python main.py post

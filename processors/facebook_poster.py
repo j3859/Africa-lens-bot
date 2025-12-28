@@ -1,127 +1,204 @@
-import requests
-from config.settings import FB_ACCESS_TOKEN, FB_PAGE_ID, FB_BASE_URL
-from utils.logger import log_info, log_error, log_success
-from utils.http_helper import download_image
-import tempfile
 import os
+import re
+import requests
+from utils.logger import log_info, log_error, log_success, log_warning
 
 class FacebookPoster:
     def __init__(self):
-        self.access_token = FB_ACCESS_TOKEN
-        self.page_id = FB_PAGE_ID
-        self.base_url = FB_BASE_URL
+        self.access_token = os.getenv("FB_ACCESS_TOKEN", "")
+        self.page_id = os.getenv("FB_PAGE_ID", "")
+        self.base_url = f"https://graph.facebook.com/v18.0/{self.page_id}"
+        self.unsplash_key = os.getenv("UNSPLASH_ACCESS_KEY", "")
+        self.pexels_key = os.getenv("PEXELS_API_KEY", "")
     
-    def post_text_only(self, message):
-        url = f"{self.base_url}/{self.page_id}/feed"
+    def clean_image_url(self, url):
+        """Extract real image URL from CDN/proxy URLs"""
+        if not url:
+            return ""
         
-        payload = {
-            "message": message,
-            "access_token": self.access_token
-        }
+        # Pattern 1: cdn4.premiumread.com/?url=REAL_URL&...
+        if "premiumread.com" in url:
+            match = re.search(r'url=([^&]+)', url)
+            if match:
+                url = requests.utils.unquote(match.group(1))
+        
+        # Pattern 2: images.weserv.nl/?url=REAL_URL
+        if "weserv.nl" in url:
+            match = re.search(r'url=([^&]+)', url)
+            if match:
+                url = requests.utils.unquote(match.group(1))
+        
+        # Pattern 3: wp.com proxy
+        if "wp.com" in url and "i0.wp.com" in url or "i1.wp.com" in url or "i2.wp.com" in url:
+            url = re.sub(r'https?://i\d\.wp\.com/', 'https://', url)
+        
+        # Ensure URL has protocol
+        if url and not url.startswith("http"):
+            url = "https://" + url
+        
+        return url
+    
+    def validate_image_url(self, url):
+        """Check if image URL is accessible and valid"""
+        if not url:
+            return False
         
         try:
-            response = requests.post(url, data=payload)
-            result = response.json()
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
             
-            if "id" in result:
-                log_success(f"Posted successfully. Post ID: {result['id']}")
-                return result["id"]
-            else:
-                log_error(f"Facebook API error: {result}")
-                return None
-        
+            if response.status_code != 200:
+                return False
+            
+            content_type = response.headers.get('content-type', '')
+            if not any(t in content_type.lower() for t in ['image', 'jpeg', 'jpg', 'png', 'gif', 'webp']):
+                return False
+            
+            # Check file size (Facebook limit is 10MB)
+            content_length = response.headers.get('content-length')
+            if content_length and int(content_length) > 10 * 1024 * 1024:
+                return False
+            
+            return True
+            
         except Exception as e:
-            log_error(f"Failed to post: {e}")
-            return None
+            log_warning(f"Image validation failed: {e}")
+            return False
+    
+    def get_fallback_image(self, query="africa news"):
+        """Get fallback image from Unsplash or Pexels"""
+        
+        # Try Unsplash first
+        if self.unsplash_key:
+            try:
+                url = f"https://api.unsplash.com/photos/random?query={query}&orientation=landscape"
+                headers = {"Authorization": f"Client-ID {self.unsplash_key}"}
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    image_url = data.get("urls", {}).get("regular", "")
+                    if image_url:
+                        log_info("Using Unsplash fallback image")
+                        return image_url
+            except Exception as e:
+                log_warning(f"Unsplash fallback failed: {e}")
+        
+        # Try Pexels
+        if self.pexels_key:
+            try:
+                url = f"https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape"
+                headers = {"Authorization": self.pexels_key}
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    photos = data.get("photos", [])
+                    if photos:
+                        image_url = photos[0].get("src", {}).get("large", "")
+                        if image_url:
+                            log_info("Using Pexels fallback image")
+                            return image_url
+            except Exception as e:
+                log_warning(f"Pexels fallback failed: {e}")
+        
+        return ""
     
     def post_with_image_url(self, message, image_url):
-        # STRATEGY 1: Download and upload (bypasses hotlink protection)
-        image_data = download_image(image_url)
-        if image_data:
-            try:
-                # Create temp file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp:
-                    temp.write(image_data)
-                    temp_path = temp.name
-                
-                url = f"{self.base_url}/{self.page_id}/photos"
-                payload = {
-                    "message": message,
-                    "access_token": self.access_token
-                }
-                files = {
-                    "source": open(temp_path, "rb")
-                }
-                
-                log_info(f"Uploading image from {temp_path}...")
-                response = requests.post(url, data=payload, files=files)
-                result = response.json()
-                
-                # Cleanup
-                files["source"].close()
-                os.unlink(temp_path)
-                
-                if "id" in result or "post_id" in result:
-                    post_id = result.get("post_id", result.get("id"))
-                    log_success(f"Posted text+image (uploaded). Post ID: {post_id}")
-                    return post_id
-                else:
-                    log_error(f"FB Upload Error: {result}")
-                    # Continue to Strategy 2
-            except Exception as e:
-                log_error(f"Image upload failed: {e}")
-                # Continue to Strategy 2
-        
-        # STRATEGY 2: Send URL (Facebook fetches it)
-        log_info(f"Attempting to post with image URL directly: {image_url}")
-        url = f"{self.base_url}/{self.page_id}/photos"
-        
-        payload = {
-            "message": message,
-            "url": image_url,
-            "access_token": self.access_token
-        }
-        
+        """Post with image URL directly"""
         try:
-            response = requests.post(url, data=payload)
-            result = response.json()
+            url = f"{self.base_url}/photos"
+            data = {
+                "url": image_url,
+                "caption": message,
+                "access_token": self.access_token
+            }
             
-            if "id" in result or "post_id" in result:
-                post_id = result.get("post_id", result.get("id"))
-                log_success(f"Posted with image URL. Post ID: {post_id}")
-                return post_id
-            else:
-                log_error(f"FB URL Post Error: {result}")
-                log_info("Falling back to text-only post")
-                return self.post_text_only(message)
-        
-        except Exception as e:
-            log_error(f"Failed to post with image: {e}")
-            return self.post_text_only(message)
-    
-    def post(self, message, image_url=None):
-        if image_url and image_url.startswith("http"):
-            return self.post_with_image_url(message, image_url)
-        else:
-            return self.post_text_only(message)
-    
-    def verify_token(self):
-        url = f"{self.base_url}/me"
-        params = {"access_token": self.access_token}
-        
-        try:
-            response = requests.get(url, params=params)
+            response = requests.post(url, data=data, timeout=60)
             result = response.json()
             
             if "id" in result:
-                log_success(f"Token valid. Page: {result.get('name', 'Unknown')}")
-                return True
-            else:
-                log_error(f"Token invalid: {result}")
-                return False
-        
+                return result["id"]
+            elif "error" in result:
+                log_error(f"FB Photo Post Error: {result['error'].get('message', 'Unknown error')}")
+                return None
+            
+            return None
+            
         except Exception as e:
-            log_error(f"Token verification failed: {e}")
-            return False
+            log_error(f"FB post with image URL error: {e}")
+            return None
+    
+    def post_text_only(self, message):
+        """Post text only without image"""
+        try:
+            url = f"{self.base_url}/feed"
+            data = {
+                "message": message,
+                "access_token": self.access_token
+            }
+            
+            response = requests.post(url, data=data, timeout=30)
+            result = response.json()
+            
+            if "id" in result:
+                return result["id"]
+            elif "error" in result:
+                log_error(f"FB Text Post Error: {result['error'].get('message', 'Unknown error')}")
+                return None
+            
+            return None
+            
+        except Exception as e:
+            log_error(f"FB text post error: {e}")
+            return None
+    
+    def post(self, message, image_url="", country="africa", niche="news"):
+        """Main post method with fallback logic"""
+        
+        if not self.access_token or not self.page_id:
+            log_error("Facebook credentials not configured")
+            return None
+        
+        # Step 1: Clean and validate image URL
+        if image_url:
+            cleaned_url = self.clean_image_url(image_url)
+            log_info(f"Cleaned image URL: {cleaned_url[:70]}...")
+            
+            if self.validate_image_url(cleaned_url):
+                log_info("Image URL validated, posting with image...")
+                result = self.post_with_image_url(message, cleaned_url)
+                if result:
+                    log_success(f"Posted with image. Post ID: {result}")
+                    return result
+                else:
+                    log_warning("Image post failed, trying fallback...")
+            else:
+                log_warning("Image URL validation failed")
+        
+        # Step 2: Try fallback image from Unsplash/Pexels
+        fallback_query = f"{country} {niche}".replace("Pan-African", "africa")
+        fallback_url = self.get_fallback_image(fallback_query)
+        
+        if fallback_url:
+            log_info("Attempting post with fallback image...")
+            result = self.post_with_image_url(message, fallback_url)
+            if result:
+                log_success(f"Posted with fallback image. Post ID: {result}")
+                return result
+        
+        # Step 3: Fall back to text-only post
+        log_info("Posting text-only...")
+        result = self.post_text_only(message)
+        
+        if result:
+            log_success(f"Posted text-only. Post ID: {result}")
+            return result
+        
+        log_error("All posting attempts failed")
+        return None
+
 
 fb_poster = FacebookPoster()

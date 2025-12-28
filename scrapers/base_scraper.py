@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
 from utils.http_helper import fetch_page, extract_og_image
-from utils.database import db
+from utils.database import Database
 from utils.logger import log_info, log_error, log_scrape, log_warning
 from utils.image_finder import get_stock_image
 

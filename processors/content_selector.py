@@ -1,4 +1,6 @@
-from utils.database import db
+from utils.database import Database
+
+db = Database()
 from utils.logger import log_info, log_warning
 from config.settings import LANGUAGE_SPLIT
 import random
