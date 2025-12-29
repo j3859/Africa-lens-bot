@@ -1,0 +1,4266 @@
+# PROJECT STRUCTURE
+
+./
+  .env
+  .gitignore
+  add_new_sources.py
+  audit_results.txt
+  diagnose_new_sources.py
+  dump_project.py
+  main.py
+  project_status.py
+  README.md
+  requirements.txt
+  test_new_sources.py
+  .github/
+    workflows/
+      analytics.yml
+      post.yml
+      report.yml
+      scrape.yml
+  config/
+    settings.py
+    __init__.py
+  processors/
+    ai_processor.py
+    content_selector.py
+    facebook_poster.py
+    post_engine.py
+    scraper_runner.py
+    telegram_reporter.py
+    __init__.py
+  scrapers/
+    abidjan_net.py
+    actualite_cd.py
+    allafrica.py
+    api_scrapers.py
+    base_scraper.py
+    burkina24.py
+    fratmat.py
+    generic_scraper.py
+    iwacu.py
+    jeune_afrique.py
+    maliactu.py
+    punch.py
+    scraper_manager.py
+    seneweb.py
+    __init__.py
+  utils/
+    database.py
+    fb_analytics.py
+    freshness_filter.py
+    http_helper.py
+    image_finder.py
+    logger.py
+    __init__.py
+
+
+# FILE CONTENTS
+
+
+============================================================
+FILE: .\add_new_sources.py
+============================================================
+import sys
+sys.path.insert(0, r"C:\Users\muchk\Desktop\fb bot1")
+
+from utils.database import Database
+
+db = Database()
+
+# New sources to add
+new_sources = [
+    # EGYPT (3)
+    {
+        "name": "Egypt Today",
+        "url": "https://www.egypttoday.com",
+        "source_type": "scrape",
+        "country": "Egypt",
+        "country_code": "EG",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    {
+        "name": "Ahram Online",
+        "url": "https://english.ahram.org.eg",
+        "source_type": "scrape",
+        "country": "Egypt",
+        "country_code": "EG",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    {
+        "name": "Egypt Independent",
+        "url": "https://egyptindependent.com",
+        "source_type": "scrape",
+        "country": "Egypt",
+        "country_code": "EG",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    
+    # ALGERIA (3)
+    {
+        "name": "TSA Algerie",
+        "url": "https://www.tsa-algerie.com",
+        "source_type": "scrape",
+        "country": "Algeria",
+        "country_code": "DZ",
+        "language": "french",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    {
+        "name": "Algerie 360",
+        "url": "https://www.algerie360.com",
+        "source_type": "scrape",
+        "country": "Algeria",
+        "country_code": "DZ",
+        "language": "french",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    {
+        "name": "Algeria Press Service",
+        "url": "https://www.aps.dz/en",
+        "source_type": "scrape",
+        "country": "Algeria",
+        "country_code": "DZ",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    
+    # KENYA (2 more)
+    {
+        "name": "The Star Kenya",
+        "url": "https://www.the-star.co.ke",
+        "source_type": "scrape",
+        "country": "Kenya",
+        "country_code": "KE",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    {
+        "name": "Citizen Digital",
+        "url": "https://www.citizen.digital",
+        "source_type": "scrape",
+        "country": "Kenya",
+        "country_code": "KE",
+        "language": "english",
+        "niche": "politics",
+        "priority": 1,
+        "is_active": True
+    },
+    
+    # TANZANIA (neighbor)
+    {
+        "name": "The Citizen Tanzania",
+        "url": "https://www.thecitizen.co.tz",
+        "source_type": "scrape",
+        "country": "Tanzania",
+        "country_code": "TZ",
+        "language": "english",
+        "niche": "politics",
+        "priority": 2,
+        "is_active": True
+    },
+    
+    # TUNISIA (neighbor for Algeria/Morocco)
+    {
+        "name": "Tunisie Numerique",
+        "url": "https://www.tunisienumerique.com",
+        "source_type": "scrape",
+        "country": "Tunisia",
+        "country_code": "TN",
+        "language": "french",
+        "niche": "politics",
+        "priority": 2,
+        "is_active": True
+    },
+    
+    # BOTSWANA (neighbor for South Africa)
+    {
+        "name": "Mmegi Botswana",
+        "url": "https://www.mmegi.bw",
+        "source_type": "scrape",
+        "country": "Botswana",
+        "country_code": "BW",
+        "language": "english",
+        "niche": "politics",
+        "priority": 2,
+        "is_active": True
+    },
+    
+    # CAMEROON (neighbor for Nigeria)
+    {
+        "name": "Cameroon Tribune",
+        "url": "https://www.cameroon-tribune.cm",
+        "source_type": "scrape",
+        "country": "Cameroon",
+        "country_code": "CM",
+        "language": "french",
+        "niche": "politics",
+        "priority": 2,
+        "is_active": True
+    },
+]
+
+print("="*60)
+print("ADDING NEW SOURCES TO DATABASE")
+print("="*60)
+
+added = 0
+skipped = 0
+
+for source in new_sources:
+    try:
+        # Check if source already exists
+        existing = db.client.table("sources").select("id").eq("name", source["name"]).execute()
+        
+        if existing.data and len(existing.data) > 0:
+            print(f"  ⏭️  {source['name']} - Already exists")
+            skipped += 1
+        else:
+            db.client.table("sources").insert(source).execute()
+            print(f"  ✅ {source['name']} ({source['country']}) - Added")
+            added += 1
+            
+    except Exception as e:
+        print(f"  ❌ {source['name']} - Error: {e}")
+
+print(f"\n{'='*60}")
+print(f"Added: {added} | Skipped: {skipped}")
+print(f"{'='*60}")
+
+# Show total sources by country
+print("\nSOURCES BY COUNTRY:")
+result = db.client.table("sources").select("country").eq("is_active", True).execute()
+countries = {}
+for s in result.data:
+    c = s["country"]
+    countries[c] = countries.get(c, 0) + 1
+
+for country, count in sorted(countries.items(), key=lambda x: -x[1]):
+    print(f"  {country}: {count}")
+
+============================================================
+FILE: .\diagnose_new_sources.py
+============================================================
+import requests
+from bs4 import BeautifulSoup
+
+def diagnose_source(url, name, country):
+    print(f"\n{'='*60}")
+    print(f"{name} ({country})")
+    print(f"{'='*60}")
+    print(f"URL: {url}")
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,ar;q=0.7',
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print("FAILED - Blocked or unavailable")
+            return
+        
+        soup = BeautifulSoup(response.text, "lxml")
+        
+        # Count articles
+        links = []
+        for a in soup.select("a[href]"):
+            text = a.get_text().strip()
+            href = a.get("href", "")
+            if 25 < len(text) < 200:
+                links.append(text[:50])
+        
+        # Count images
+        imgs = soup.select("img")
+        
+        print(f"Article links found: {len(links)}")
+        print(f"Images found: {len(imgs)}")
+        
+        if links:
+            print(f"Sample headlines:")
+            for h in links[:3]:
+                print(f"  - {h}...")
+        
+        if len(links) >= 5:
+            print("✅ VIABLE - Can build scraper")
+        else:
+            print("⚠️ LOW CONTENT - May need different approach")
+            
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+
+# EGYPT SOURCES
+print("\n" + "="*60)
+print("EGYPT SOURCES")
+print("="*60)
+
+egypt_sources = [
+    ("https://www.egypttoday.com", "Egypt Today", "Egypt"),
+    ("https://english.ahram.org.eg", "Ahram Online", "Egypt"),
+    ("https://egyptindependent.com", "Egypt Independent", "Egypt"),
+]
+
+# ALGERIA SOURCES
+algeria_sources = [
+    ("https://www.tsa-algerie.com", "TSA Algérie", "Algeria"),
+    ("https://www.elwatan.com", "El Watan", "Algeria"),
+    ("https://www.algerie360.com", "Algérie 360", "Algeria"),
+    ("https://www.aps.dz/en", "Algeria Press Service", "Algeria"),
+]
+
+# KENYA ADDITIONAL
+kenya_sources = [
+    ("https://www.the-star.co.ke", "The Star Kenya", "Kenya"),
+    ("https://www.citizen.digital", "Citizen Digital", "Kenya"),
+]
+
+# NEIGHBORS - EAST AFRICA
+east_africa_sources = [
+    ("https://www.thecitizen.co.tz", "The Citizen Tanzania", "Tanzania"),
+    ("https://www.monitor.co.ug", "Daily Monitor Uganda", "Uganda"),
+    ("https://www.newtimes.co.rw", "New Times Rwanda", "Rwanda"),
+]
+
+# NEIGHBORS - NORTH AFRICA
+north_africa_sources = [
+    ("https://www.tunisienumerique.com", "Tunisie Numérique", "Tunisia"),
+    ("https://www.libyaobserver.ly", "Libya Observer", "Libya"),
+]
+
+# NEIGHBORS - SOUTHERN AFRICA
+southern_africa_sources = [
+    ("https://www.herald.co.zw", "The Herald Zimbabwe", "Zimbabwe"),
+    ("https://www.mmegi.bw", "Mmegi Botswana", "Botswana"),
+]
+
+# NEIGHBORS - WEST AFRICA (for Nigeria)
+west_africa_sources = [
+    ("https://www.cameroon-tribune.cm", "Cameroon Tribune", "Cameroon"),
+]
+
+# MOROCCO ADDITIONAL
+morocco_sources = [
+    ("https://www.medias24.com", "Medias24", "Morocco"),
+]
+
+# Run diagnostics
+all_sources = (
+    egypt_sources + 
+    algeria_sources + 
+    kenya_sources + 
+    east_africa_sources + 
+    north_africa_sources + 
+    southern_africa_sources + 
+    west_africa_sources +
+    morocco_sources
+)
+
+for url, name, country in all_sources:
+    diagnose_source(url, name, country)
+
+print("\n" + "="*60)
+print("DIAGNOSIS COMPLETE")
+print("="*60)
+
+============================================================
+FILE: .\dump_project.py
+============================================================
+import os
+
+output = []
+output.append("# PROJECT STRUCTURE\n")
+
+# Show folder structure
+for root, dirs, files in os.walk("."):
+    # Skip unwanted folders
+    skip = ["venv", "__pycache__", "logs", ".git", "node_modules"]
+    dirs[:] = [d for d in dirs if d not in skip]
+    
+    level = root.replace(".", "").count(os.sep)
+    indent = "  " * level
+    output.append(f"{indent}{os.path.basename(root)}/")
+    
+    for file in files:
+        if not file.endswith((".pyc", ".log")):
+            output.append(f"{indent}  {file}")
+
+output.append("\n\n# FILE CONTENTS\n")
+
+# Read each Python file
+for root, dirs, files in os.walk("."):
+    skip = ["venv", "__pycache__", "logs", ".git"]
+    dirs[:] = [d for d in dirs if d not in skip]
+    
+    for file in files:
+        if file.endswith(".py"):
+            filepath = os.path.join(root, file)
+            output.append(f"\n{'='*60}")
+            output.append(f"FILE: {filepath}")
+            output.append("="*60)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    output.append(f.read())
+            except:
+                output.append("[Could not read file]")
+
+# Write to file
+with open("project_dump.txt", "w", encoding="utf-8") as f:
+    f.write("\n".join(output))
+
+print("Created project_dump.txt")
+print(f"Size: {os.path.getsize('project_dump.txt') / 1024:.1f} KB")
+
+============================================================
+FILE: .\main.py
+============================================================
+import schedule
+import time
+from datetime import datetime
+from processors.post_engine import post_engine
+from processors.scraper_runner import scraper_runner
+from processors.telegram_reporter import telegram_reporter
+from utils.database import Database
+from utils.fb_analytics import fb_analytics
+from utils.logger import log_info, log_error, log_success
+
+class AfricaLensBot:
+    def __init__(self):
+        self.db = Database()
+        self.post_engine = post_engine
+        self.scraper = scraper_runner
+        self.reporter = telegram_reporter
+        self.analytics = fb_analytics
+    
+    def show_status(self):
+        """Show current bot status"""
+        try:
+            pending_result = self.db.client.table("content").select("id").eq("status", "pending").execute()
+            pending = len(pending_result.data) if pending_result.data else 0
+            
+            today = datetime.utcnow().date().isoformat()
+            posts_result = self.db.client.table("posts").select("id").gte("posted_at", today).execute()
+            posted_today = len(posts_result.data) if posts_result.data else 0
+            
+            french_result = self.db.client.table("posts").select("id").gte("posted_at", today).eq("post_language", "french").execute()
+            english_result = self.db.client.table("posts").select("id").gte("posted_at", today).eq("post_language", "english").execute()
+            french_count = len(french_result.data) if french_result.data else 0
+            english_count = len(english_result.data) if english_result.data else 0
+            
+            print("="*50)
+            print("AFRICA LENS BOT STATUS")
+            print("="*50)
+            print(f"Pending content: {pending}")
+            print(f"Posts today: {posted_today}")
+            print(f"  - French: {french_count}")
+            print(f"  - English: {english_count}")
+            print(f"Current time (UTC): {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}")
+            print("="*50)
+            
+        except Exception as e:
+            print(f"Error getting status: {e}")
+    
+    def run_once(self):
+        """Run a single post"""
+        log_info("Running single post cycle...")
+        self.post_engine.run_scheduled_post()
+    
+    def run_scrape(self):
+        """Run all scrapers"""
+        log_info("Running scrapers...")
+        self.scraper.run_all()
+    
+    def update_analytics(self):
+        """Update analytics for recent posts"""
+        log_info("Updating analytics...")
+        self.analytics.update_all_recent_posts(hours=24)
+    
+    def show_analytics(self):
+        """Show analytics report"""
+        self.analytics.print_report(days=7)
+    
+    def run_continuous(self):
+        """Run continuously with schedule"""
+        log_info("Starting Africa Lens Bot in continuous mode...")
+        
+        # Send startup notification
+        self.reporter.send_startup_message()
+        
+        # Schedule hourly posts at :05
+        schedule.every().hour.at(":05").do(self.run_once)
+        
+        # Schedule scraping every 3 hours
+        schedule.every(3).hours.do(self.run_scrape)
+        
+        # Schedule analytics update every 6 hours
+        schedule.every(6).hours.do(self.update_analytics)
+        
+        # Schedule daily report at midnight UTC
+        schedule.every().day.at("00:00").do(self.reporter.send_daily_report)
+        
+        # Schedule weekly report on Sundays
+        schedule.every().sunday.at("12:00").do(self.reporter.send_weekly_report)
+        
+        # Run initial scrape
+        self.run_scrape()
+        
+        log_info("Bot running. Press Ctrl+C to stop.")
+        
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(60)
+            except KeyboardInterrupt:
+                log_info("Bot stopped by user")
+                break
+            except Exception as e:
+                log_error(f"Error in main loop: {e}")
+                self.reporter.send_error_alert(str(e))
+                time.sleep(300)
+
+
+if __name__ == "__main__":
+    import sys
+    
+    bot = AfricaLensBot()
+    
+    if len(sys.argv) < 2:
+        print("Usage: python main.py [status|post|scrape|run|report|analytics]")
+        sys.exit(1)
+    
+    command = sys.argv[1].lower()
+    
+    if command == "status":
+        bot.show_status()
+    elif command == "post":
+        bot.run_once()
+    elif command == "scrape":
+        bot.run_scrape()
+    elif command == "run":
+        bot.run_continuous()
+    elif command == "report":
+        bot.reporter.send_daily_report()
+        print("Report sent (if Telegram configured)")
+    elif command == "analytics":
+        bot.show_analytics()
+    else:
+        print(f"Unknown command: {command}")
+        print("Available: status, post, scrape, run, report, analytics")
+
+============================================================
+FILE: .\project_status.py
+============================================================
+"""
+Africa Lens Bot - Complete Project Status Check
+Checks all components against original project plan
+"""
+
+import os
+import sys
+from datetime import datetime, timedelta
+
+print("=" * 60)
+print("AFRICA LENS BOT - PROJECT STATUS REPORT")
+print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+print("=" * 60)
+
+# Track overall status
+status_summary = {
+    "working": [],
+    "partial": [],
+    "not_working": [],
+    "not_started": []
+}
+
+# ============================================================
+# 1. ENVIRONMENT & DEPENDENCIES
+# ============================================================
+print("\n[1] ENVIRONMENT & DEPENDENCIES")
+print("-" * 40)
+
+# Check .env file
+if os.path.exists(".env"):
+    print("  .env file: EXISTS")
+    status_summary["working"].append(".env file")
+else:
+    print("  .env file: MISSING")
+    status_summary["not_working"].append(".env file")
+
+# Check required packages
+required_packages = [
+    "requests", "bs4", "supabase", "google.generativeai",
+    "dotenv", "schedule", "lxml"
+]
+missing_packages = []
+for pkg in required_packages:
+    try:
+        __import__(pkg)
+    except ImportError:
+        missing_packages.append(pkg)
+
+if not missing_packages:
+    print("  Dependencies: ALL INSTALLED")
+    status_summary["working"].append("Dependencies")
+else:
+    print(f"  Dependencies: MISSING {missing_packages}")
+    status_summary["not_working"].append("Dependencies")
+
+# ============================================================
+# 2. CONFIGURATION
+# ============================================================
+print("\n[2] CONFIGURATION")
+print("-" * 40)
+
+try:
+    from config.settings import (
+        FB_ACCESS_TOKEN, FB_PAGE_ID, SUPABASE_URL,
+        SUPABASE_KEY, GEMINI_API_KEY
+    )
+    
+    configs = {
+        "FB_ACCESS_TOKEN": bool(FB_ACCESS_TOKEN and FB_ACCESS_TOKEN != "placeholder"),
+        "FB_PAGE_ID": bool(FB_PAGE_ID and FB_PAGE_ID != "placeholder"),
+        "SUPABASE_URL": bool(SUPABASE_URL and SUPABASE_URL != "placeholder"),
+        "SUPABASE_KEY": bool(SUPABASE_KEY and SUPABASE_KEY != "placeholder"),
+        "GEMINI_API_KEY": bool(GEMINI_API_KEY and GEMINI_API_KEY != "placeholder"),
+    }
+    
+    for key, valid in configs.items():
+        status = "SET" if valid else "MISSING/PLACEHOLDER"
+        print(f"  {key}: {status}")
+    
+    if all(configs.values()):
+        status_summary["working"].append("Configuration")
+    else:
+        status_summary["partial"].append("Configuration")
+        
+except Exception as e:
+    print(f"  Configuration error: {e}")
+    status_summary["not_working"].append("Configuration")
+
+# ============================================================
+# 3. DATABASE CONNECTION & TABLES
+# ============================================================
+print("\n[3] DATABASE (SUPABASE)")
+print("-" * 40)
+
+try:
+    from utils.database import supabase
+    
+    tables_expected = ["sources", "content", "posts", "schedule", "language_stats", "country_stats"]
+    tables_status = {}
+    
+    for table in tables_expected:
+        try:
+            result = supabase.table(table).select("*").limit(1).execute()
+            count_result = supabase.table(table).select("*", count="exact").execute()
+            count = count_result.count if hasattr(count_result, 'count') else len(count_result.data)
+            tables_status[table] = count
+            print(f"  {table}: {count} records")
+        except Exception as e:
+            tables_status[table] = None
+            print(f"  {table}: ERROR - {e}")
+    
+    if all(v is not None for v in tables_status.values()):
+        status_summary["working"].append("Database Connection")
+        status_summary["working"].append("Database Tables")
+    else:
+        status_summary["partial"].append("Database Tables")
+        
+except Exception as e:
+    print(f"  Database error: {e}")
+    status_summary["not_working"].append("Database")
+
+# ============================================================
+# 4. SCRAPERS
+# ============================================================
+print("\n[4] SCRAPERS")
+print("-" * 40)
+
+scraper_files = {
+    "jeune_afrique.py": "Jeune Afrique (Pan-African French)",
+    "actualite_cd.py": "Actualite.cd (DRC French)",
+    "iwacu.py": "IWACU (Burundi French)",
+    "punch.py": "Punch Nigeria (English)",
+    "burkina24.py": "Burkina 24 (French)",
+    "base_scraper.py": "Base Scraper Class",
+    "scraper_manager.py": "Scraper Manager",
+}
+
+scrapers_found = 0
+for filename, description in scraper_files.items():
+    filepath = os.path.join("scrapers", filename)
+    exists = os.path.exists(filepath)
+    status = "EXISTS" if exists else "MISSING"
+    print(f"  {description}: {status}")
+    if exists:
+        scrapers_found += 1
+
+if scrapers_found == len(scraper_files):
+    status_summary["working"].append("Scraper Files")
+else:
+    status_summary["partial"].append("Scraper Files")
+
+# Check sources in database
+try:
+    sources_result = supabase.table("sources").select("*").execute()
+    total_sources = len(sources_result.data)
+    active_sources = len([s for s in sources_result.data if s.get("is_active")])
+    print(f"\n  Sources in database: {total_sources}")
+    print(f"  Active sources: {active_sources}")
+except:
+    pass
+
+# ============================================================
+# 5. PROCESSORS
+# ============================================================
+print("\n[5] PROCESSORS")
+print("-" * 40)
+
+processor_files = {
+    "ai_processor.py": "AI Processor (Gemini)",
+    "facebook_poster.py": "Facebook Poster",
+    "content_selector.py": "Content Selector",
+    "post_engine.py": "Post Engine",
+    "scraper_runner.py": "Scraper Runner",
+}
+
+processors_found = 0
+for filename, description in processor_files.items():
+    filepath = os.path.join("processors", filename)
+    exists = os.path.exists(filepath)
+    status = "EXISTS" if exists else "MISSING"
+    print(f"  {description}: {status}")
+    if exists:
+        processors_found += 1
+
+if processors_found == len(processor_files):
+    status_summary["working"].append("Processor Files")
+else:
+    status_summary["partial"].append("Processor Files")
+
+# ============================================================
+# 6. AI PROCESSOR TEST
+# ============================================================
+print("\n[6] AI PROCESSOR (GEMINI)")
+print("-" * 40)
+
+try:
+    from processors.ai_processor import ai_processor
+    print("  Module loaded: YES")
+    
+    # Check model name
+    if hasattr(ai_processor, 'model'):
+        model_name = getattr(ai_processor.model, 'model_name', 'Unknown')
+        print(f"  Model: {model_name}")
+    
+    status_summary["working"].append("AI Processor")
+except Exception as e:
+    print(f"  AI Processor error: {e}")
+    status_summary["not_working"].append("AI Processor")
+
+# ============================================================
+# 7. FACEBOOK POSTER TEST
+# ============================================================
+print("\n[7] FACEBOOK POSTER")
+print("-" * 40)
+
+try:
+    from processors.facebook_poster import fb_poster
+    print("  Module loaded: YES")
+    
+    # Verify token
+    token_valid = fb_poster.verify_token()
+    print(f"  Token valid: {'YES' if token_valid else 'NO'}")
+    
+    if token_valid:
+        status_summary["working"].append("Facebook Poster")
+    else:
+        status_summary["partial"].append("Facebook Poster")
+except Exception as e:
+    print(f"  Facebook Poster error: {e}")
+    status_summary["not_working"].append("Facebook Poster")
+
+# ============================================================
+# 8. CONTENT STATUS
+# ============================================================
+print("\n[8] CONTENT STATUS")
+print("-" * 40)
+
+try:
+    # Pending content
+    pending = supabase.table("content").select("*").eq("status", "pending").execute()
+    pending_count = len(pending.data)
+    print(f"  Pending articles: {pending_count}")
+    
+    # Posted content
+    posted = supabase.table("content").select("*").eq("status", "posted").execute()
+    posted_count = len(posted.data)
+    print(f"  Posted articles: {posted_count}")
+    
+    # Content with images
+    with_images = len([c for c in pending.data if c.get("image_url") and c["image_url"].startswith("http")])
+    print(f"  Pending with images: {with_images}")
+    
+    # By language
+    french_content = len([c for c in pending.data if c.get("source_language") == "french"])
+    english_content = len([c for c in pending.data if c.get("source_language") == "english"])
+    print(f"  French content: {french_content}")
+    print(f"  English content: {english_content}")
+    
+    status_summary["working"].append("Content Pipeline")
+except Exception as e:
+    print(f"  Content check error: {e}")
+
+# ============================================================
+# 9. POSTING HISTORY
+# ============================================================
+print("\n[9] POSTING HISTORY")
+print("-" * 40)
+
+try:
+    posts = supabase.table("posts").select("*").order("posted_at", desc=True).limit(10).execute()
+    total_posts = len(posts.data)
+    print(f"  Total posts recorded: {total_posts}")
+    
+    if posts.data:
+        latest = posts.data[0]
+        print(f"  Latest post: {latest.get('posted_at', 'Unknown')}")
+        
+        # Language breakdown
+        french_posts = len([p for p in posts.data if p.get("post_language") == "french"])
+        english_posts = len([p for p in posts.data if p.get("post_language") == "english"])
+        print(f"  Recent French posts: {french_posts}")
+        print(f"  Recent English posts: {english_posts}")
+except Exception as e:
+    print(f"  Posts check error: {e}")
+
+# ============================================================
+# 10. SCHEDULE
+# ============================================================
+print("\n[10] POSTING SCHEDULE")
+print("-" * 40)
+
+try:
+    schedule = supabase.table("schedule").select("*").execute()
+    schedule_count = len(schedule.data)
+    active_slots = len([s for s in schedule.data if s.get("is_active")])
+    print(f"  Total slots: {schedule_count}")
+    print(f"  Active slots: {active_slots}")
+    
+    if schedule_count == 24:
+        print("  24-hour coverage: YES")
+        status_summary["working"].append("Posting Schedule")
+    else:
+        print(f"  24-hour coverage: NO ({schedule_count}/24)")
+        status_summary["partial"].append("Posting Schedule")
+except Exception as e:
+    print(f"  Schedule check error: {e}")
+
+# ============================================================
+# 11. UTILITIES
+# ============================================================
+print("\n[11] UTILITIES")
+print("-" * 40)
+
+utility_files = {
+    "database.py": "Database Operations",
+    "logger.py": "Logging Utility",
+    "http_helper.py": "HTTP Helper",
+}
+
+utils_found = 0
+for filename, description in utility_files.items():
+    filepath = os.path.join("utils", filename)
+    exists = os.path.exists(filepath)
+    status = "EXISTS" if exists else "MISSING"
+    print(f"  {description}: {status}")
+    if exists:
+        utils_found += 1
+
+if utils_found == len(utility_files):
+    status_summary["working"].append("Utility Files")
+
+# ============================================================
+# 12. MAIN ENTRY POINT
+# ============================================================
+print("\n[12] MAIN ENTRY POINT")
+print("-" * 40)
+
+if os.path.exists("main.py"):
+    print("  main.py: EXISTS")
+    status_summary["working"].append("Main Entry Point")
+else:
+    print("  main.py: MISSING")
+    status_summary["not_working"].append("Main Entry Point")
+
+# ============================================================
+# 13. LOGS DIRECTORY
+# ============================================================
+print("\n[13] LOGGING")
+print("-" * 40)
+
+if os.path.exists("logs"):
+    log_files = os.listdir("logs")
+    print(f"  logs/ directory: EXISTS")
+    print(f"  Log files: {len(log_files)}")
+    status_summary["working"].append("Logging")
+else:
+    print("  logs/ directory: MISSING")
+    status_summary["partial"].append("Logging")
+
+# ============================================================
+# 14. NOT YET IMPLEMENTED
+# ============================================================
+print("\n[14] NOT YET IMPLEMENTED (Per Original Plan)")
+print("-" * 40)
+
+not_implemented = [
+    "Reddit API integration",
+    "Google Trends integration",
+    "YouTube Data API",
+    "NewsAPI.org integration",
+    "GNews.io integration",
+    "Facebook analytics/metrics collection",
+    "Stock image fallback (Unsplash/Pexels)",
+    "Telegram deployment",
+    "24/7 cloud hosting",
+]
+
+for item in not_implemented:
+    print(f"  [ ] {item}")
+    status_summary["not_started"].append(item)
+
+# ============================================================
+# FINAL SUMMARY
+# ============================================================
+print("\n")
+print("=" * 60)
+print("FINAL SUMMARY")
+print("=" * 60)
+
+print(f"\n  WORKING ({len(status_summary['working'])} items):")
+for item in status_summary["working"]:
+    print(f"    [OK] {item}")
+
+if status_summary["partial"]:
+    print(f"\n  PARTIAL ({len(status_summary['partial'])} items):")
+    for item in status_summary["partial"]:
+        print(f"    [!!] {item}")
+
+if status_summary["not_working"]:
+    print(f"\n  NOT WORKING ({len(status_summary['not_working'])} items):")
+    for item in status_summary["not_working"]:
+        print(f"    [XX] {item}")
+
+print(f"\n  NOT STARTED ({len(status_summary['not_started'])} items):")
+for item in status_summary["not_started"]:
+    print(f"    [--] {item}")
+
+# Calculate completion percentage
+total_planned = len(status_summary["working"]) + len(status_summary["partial"]) + len(status_summary["not_working"]) + len(status_summary["not_started"])
+completed = len(status_summary["working"])
+partial = len(status_summary["partial"]) * 0.5
+
+completion = ((completed + partial) / total_planned) * 100 if total_planned > 0 else 0
+
+print("\n" + "=" * 60)
+print(f"PROJECT COMPLETION: {completion:.1f}%")
+print("=" * 60)
+
+print("\nCore bot functionality (scraping, AI, posting) is COMPLETE.")
+print("Remaining items are enhancements and deployment.")
+
+============================================================
+FILE: .\test_new_sources.py
+============================================================
+import sys
+sys.path.insert(0, r"C:\Users\muchk\Desktop\fb bot1")
+
+from scrapers.generic_scraper import GenericScraper
+from utils.http_helper import fetch_page
+
+# Test the new sources
+test_sources = [
+    ("https://www.egypttoday.com", "Egypt Today", "EG", "english"),
+    ("https://english.ahram.org.eg", "Ahram Online", "EG", "english"),
+    ("https://egyptindependent.com", "Egypt Independent", "EG", "english"),
+    ("https://www.tsa-algerie.com", "TSA Algerie", "DZ", "french"),
+    ("https://www.algerie360.com", "Algerie 360", "DZ", "french"),
+    ("https://www.aps.dz/en", "Algeria Press Service", "DZ", "english"),
+    ("https://www.the-star.co.ke", "The Star Kenya", "KE", "english"),
+    ("https://www.citizen.digital", "Citizen Digital", "KE", "english"),
+    ("https://www.thecitizen.co.tz", "Citizen Tanzania", "TZ", "english"),
+    ("https://www.tunisienumerique.com", "Tunisie Numerique", "TN", "french"),
+    ("https://www.mmegi.bw", "Mmegi Botswana", "BW", "english"),
+    ("https://www.cameroon-tribune.cm", "Cameroon Tribune", "CM", "french"),
+]
+
+print("="*70)
+print("TESTING GENERIC SCRAPER ON NEW SOURCES")
+print("="*70)
+print(f"\n{'Source':<25} {'Articles':<10} {'Images':<10} {'Status'}")
+print("-"*70)
+
+results = {"ok": [], "low": [], "fail": []}
+
+for url, name, code, lang in test_sources:
+    try:
+        scraper = GenericScraper(
+            source_id=999,
+            name=name,
+            url=url,
+            country=name,
+            country_code=code,
+            language=lang,
+            niche="politics"
+        )
+        
+        html = fetch_page(url)
+        if not html:
+            print(f"{name:<25} {'FAIL':<10} {'-':<10} Fetch failed")
+            results["fail"].append(name)
+            continue
+        
+        articles = scraper.parse_articles(html)
+        with_images = sum(1 for a in articles if a.get("image"))
+        
+        if len(articles) >= 5 and with_images >= 3:
+            status = "✅ OK"
+            results["ok"].append(name)
+        elif len(articles) >= 3:
+            status = "⚠️ LOW"
+            results["low"].append(name)
+        else:
+            status = "❌ POOR"
+            results["fail"].append(name)
+        
+        print(f"{name:<25} {len(articles):<10} {with_images:<10} {status}")
+        
+    except Exception as e:
+        print(f"{name:<25} {'ERR':<10} {'-':<10} {str(e)[:20]}")
+        results["fail"].append(name)
+
+print("\n" + "="*70)
+print("SUMMARY")
+print("="*70)
+print(f"\n✅ Working well: {len(results['ok'])}")
+for s in results["ok"]:
+    print(f"   - {s}")
+
+print(f"\n⚠️ Low but usable: {len(results['low'])}")
+for s in results["low"]:
+    print(f"   - {s}")
+
+print(f"\n❌ Need custom scraper: {len(results['fail'])}")
+for s in results["fail"]:
+    print(f"   - {s}")
+
+============================================================
+FILE: .\config\settings.py
+============================================================
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
+FB_PAGE_ID = os.getenv("FB_PAGE_ID")
+FB_API_VERSION = "v18.0"
+FB_BASE_URL = f"https://graph.facebook.com/{FB_API_VERSION}"
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "AfricaBot/1.0")
+
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
+GNEWS_KEY = os.getenv("GNEWS_KEY")
+
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+LANGUAGE_SPLIT = {"french": 0.70, "english": 0.30}
+
+NICHE_SPLIT = {"politics": 0.35, "business": 0.25, "tech": 0.20, "entertainment": 0.15, "sports": 0.05}
+
+TIER_1_COUNTRIES = [
+    {"name": "Burundi", "code": "BI", "language": "french", "weight": 0.20},
+    {"name": "DRC", "code": "CD", "language": "french", "weight": 0.15},
+    {"name": "Ivory Coast", "code": "CI", "language": "french", "weight": 0.12},
+    {"name": "Kenya", "code": "KE", "language": "english", "weight": 0.10},
+    {"name": "Burkina Faso", "code": "BF", "language": "french", "weight": 0.08},
+    {"name": "Mali", "code": "ML", "language": "french", "weight": 0.08},
+    {"name": "Guinea", "code": "GN", "language": "french", "weight": 0.07},
+]
+
+TIER_2_COUNTRIES = [
+    {"name": "Nigeria", "code": "NG", "language": "english", "weight": 0.15},
+    {"name": "South Africa", "code": "ZA", "language": "english", "weight": 0.12},
+    {"name": "Ghana", "code": "GH", "language": "english", "weight": 0.10},
+    {"name": "Senegal", "code": "SN", "language": "french", "weight": 0.10},
+    {"name": "Cameroon", "code": "CM", "language": "french", "weight": 0.08},
+    {"name": "Morocco", "code": "MA", "language": "french", "weight": 0.08},
+    {"name": "Ethiopia", "code": "ET", "language": "english", "weight": 0.07},
+    {"name": "Tanzania", "code": "TZ", "language": "english", "weight": 0.05},
+    {"name": "Uganda", "code": "UG", "language": "english", "weight": 0.05},
+    {"name": "Rwanda", "code": "RW", "language": "french", "weight": 0.05},
+    {"name": "Algeria", "code": "DZ", "language": "french", "weight": 0.05},
+]
+
+IMAGE_WIDTH = 1200
+IMAGE_HEIGHT = 630
+
+============================================================
+FILE: .\config\__init__.py
+============================================================
+
+
+============================================================
+FILE: .\processors\ai_processor.py
+============================================================
+import google.generativeai as genai
+from config.settings import GEMINI_API_KEY
+from utils.logger import log_info, log_error, log_success
+
+genai.configure(api_key=GEMINI_API_KEY)
+
+class AIProcessor:
+    def __init__(self):
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
+    
+    def generate_post(self, headline, summary, country, niche, output_language):
+        source_text = headline
+        if summary:
+            source_text = f"{headline}. {summary}"
+        
+        if output_language == "french":
+            prompt = self._get_french_prompt(source_text, country, niche)
+        else:
+            prompt = self._get_english_prompt(source_text, country, niche)
+        
+        try:
+            response = self.model.generate_content(prompt)
+            post_text = response.text.strip()
+            
+            # Clean up any markdown or quotes
+            post_text = post_text.replace("`", "").strip()
+            if post_text.startswith('"') and post_text.endswith('"'):
+                post_text = post_text[1:-1]
+            
+            return post_text
+        
+        except Exception as e:
+            log_error(f"Gemini API error: {e}")
+            return None
+    
+    def _get_french_prompt(self, source_text, country, niche):
+        return f'''Tu es un gestionnaire de page Facebook africaine avec 120 000 abonnés.
+Crée un post Facebook engageant en FRANÇAIS basé sur cette actualité.
+
+Actualité: {source_text}
+Pays concerné: {country}
+Catégorie: {niche}
+
+Règles:
+- Écris en français courant et accessible
+- Commence par une accroche forte (première ligne très importante)
+- 2-3 paragraphes courts maximum
+- Ajoute 2-3 emojis pertinents (pas trop)
+- Termine par une question pour encourager les commentaires
+- Ajoute 2-3 hashtags pertinents à la fin
+- Ne copie pas le texte source, reformule complètement
+- Ton: informatif mais conversationnel
+- Ne mets pas de guillemets autour du post
+
+Génère uniquement le post, rien d'autre.'''
+
+    def _get_english_prompt(self, source_text, country, niche):
+        return f'''You are an African Facebook page manager with 120,000 followers.
+Create an engaging Facebook post in ENGLISH based on this news.
+
+News: {source_text}
+Country: {country}
+Category: {niche}
+
+Rules:
+- Write in clear, accessible English
+- Start with a strong hook (first line is crucial)
+- 2-3 short paragraphs maximum
+- Add 2-3 relevant emojis (not too many)
+- End with a question to encourage comments
+- Add 2-3 relevant hashtags at the end
+- Do not copy the source text, completely rewrite it
+- Tone: informative but conversational
+- Do not put quotes around the post
+
+Generate only the post, nothing else.'''
+
+ai_processor = AIProcessor()
+
+============================================================
+FILE: .\processors\content_selector.py
+============================================================
+from utils.database import Database
+
+db = Database()
+from utils.logger import log_info, log_warning
+from config.settings import LANGUAGE_SPLIT
+import random
+
+class ContentSelector:
+    def __init__(self):
+        self.target_french = LANGUAGE_SPLIT["french"]
+        self.target_english = LANGUAGE_SPLIT["english"]
+    
+    def get_next_language(self):
+        ratio = db.get_language_ratio(hours=24)
+        
+        if ratio["total"] == 0:
+            return "french"  # Start with french (majority audience)
+        
+        current_french_pct = ratio["french_pct"] / 100
+        
+        # If french is below target, post french
+        if current_french_pct < self.target_french:
+            return "french"
+        else:
+            return "english"
+    
+    def select_content(self, schedule_slot=None):
+        # Determine language needed
+        output_language = self.get_next_language()
+        
+        # Get target country and niche from schedule if provided
+        target_country = None
+        target_niche = None
+        
+        if schedule_slot:
+            target_country = schedule_slot.get("target_country")
+            target_niche = schedule_slot.get("target_niche")
+            # Schedule might override language
+            if schedule_slot.get("target_language"):
+                output_language = schedule_slot["target_language"]
+        
+        # Try to find content matching criteria
+        country_code = self._get_country_code(target_country)
+        
+        # First try: exact match
+        content = db.get_pending_content(
+            country_code=country_code,
+            niche=target_niche,
+            limit=5
+        )
+        
+        # Second try: just country
+        if not content and country_code:
+            content = db.get_pending_content(
+                country_code=country_code,
+                limit=5
+            )
+        
+        # Third try: just niche
+        if not content and target_niche:
+            content = db.get_pending_content(
+                niche=target_niche,
+                limit=5
+            )
+        
+        # Fourth try: any pending content
+        if not content:
+            content = db.get_pending_content(limit=10)
+        
+        if not content:
+            log_warning("No pending content available")
+            return None, None
+        
+        # Pick one randomly from top results
+        selected = random.choice(content[:min(3, len(content))])
+        
+        log_info(f"Selected: [{selected['country']}] {selected['headline'][:50]}...")
+        log_info(f"Output language: {output_language}")
+        
+        return selected, output_language
+    
+    def _get_country_code(self, country_name):
+        if not country_name:
+            return None
+        
+        mapping = {
+            "Burundi": "BI",
+            "DRC": "CD",
+            "Ivory Coast": "CI",
+            "Kenya": "KE",
+            "Burkina Faso": "BF",
+            "Mali": "ML",
+            "Guinea": "GN",
+            "Nigeria": "NG",
+            "South Africa": "ZA",
+            "Ghana": "GH",
+            "Senegal": "SN",
+            "Cameroon": "CM",
+            "Morocco": "MA",
+            "Ethiopia": "ET",
+            "Rwanda": "RW",
+            "Pan-African": "AF",
+        }
+        
+        return mapping.get(country_name)
+
+content_selector = ContentSelector()
+
+# Updated 12/29/2025 00:17:30
+
+
+============================================================
+FILE: .\processors\facebook_poster.py
+============================================================
+import os
+import re
+import requests
+from utils.logger import log_info, log_error, log_success, log_warning
+
+class FacebookPoster:
+    def __init__(self):
+        self.access_token = os.getenv("FB_ACCESS_TOKEN", "")
+        self.page_id = os.getenv("FB_PAGE_ID", "")
+        self.base_url = f"https://graph.facebook.com/v18.0/{self.page_id}"
+        self.unsplash_key = os.getenv("UNSPLASH_ACCESS_KEY", "")
+        self.pexels_key = os.getenv("PEXELS_API_KEY", "")
+    
+    def clean_image_url(self, url):
+        """Extract real image URL from CDN/proxy URLs"""
+        if not url:
+            return ""
+        
+        # Pattern 1: cdn4.premiumread.com/?url=REAL_URL&...
+        if "premiumread.com" in url:
+            match = re.search(r'url=([^&]+)', url)
+            if match:
+                url = requests.utils.unquote(match.group(1))
+        
+        # Pattern 2: images.weserv.nl/?url=REAL_URL
+        if "weserv.nl" in url:
+            match = re.search(r'url=([^&]+)', url)
+            if match:
+                url = requests.utils.unquote(match.group(1))
+        
+        # Pattern 3: wp.com proxy
+        if "wp.com" in url and "i0.wp.com" in url or "i1.wp.com" in url or "i2.wp.com" in url:
+            url = re.sub(r'https?://i\d\.wp\.com/', 'https://', url)
+        
+        # Ensure URL has protocol
+        if url and not url.startswith("http"):
+            url = "https://" + url
+        
+        return url
+    
+    def validate_image_url(self, url):
+        """Check if image URL is accessible and valid"""
+        if not url:
+            return False
+        
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
+            
+            if response.status_code != 200:
+                return False
+            
+            content_type = response.headers.get('content-type', '')
+            if not any(t in content_type.lower() for t in ['image', 'jpeg', 'jpg', 'png', 'gif', 'webp']):
+                return False
+            
+            # Check file size (Facebook limit is 10MB)
+            content_length = response.headers.get('content-length')
+            if content_length and int(content_length) > 10 * 1024 * 1024:
+                return False
+            
+            return True
+            
+        except Exception as e:
+            log_warning(f"Image validation failed: {e}")
+            return False
+    
+    def get_fallback_image(self, query="africa news"):
+        """Get fallback image from Unsplash or Pexels"""
+        
+        # Try Unsplash first
+        if self.unsplash_key:
+            try:
+                url = f"https://api.unsplash.com/photos/random?query={query}&orientation=landscape"
+                headers = {"Authorization": f"Client-ID {self.unsplash_key}"}
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    image_url = data.get("urls", {}).get("regular", "")
+                    if image_url:
+                        log_info("Using Unsplash fallback image")
+                        return image_url
+            except Exception as e:
+                log_warning(f"Unsplash fallback failed: {e}")
+        
+        # Try Pexels
+        if self.pexels_key:
+            try:
+                url = f"https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape"
+                headers = {"Authorization": self.pexels_key}
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    photos = data.get("photos", [])
+                    if photos:
+                        image_url = photos[0].get("src", {}).get("large", "")
+                        if image_url:
+                            log_info("Using Pexels fallback image")
+                            return image_url
+            except Exception as e:
+                log_warning(f"Pexels fallback failed: {e}")
+        
+        return ""
+    
+    def post_with_image_url(self, message, image_url):
+        """Post with image URL directly"""
+        try:
+            url = f"{self.base_url}/photos"
+            data = {
+                "url": image_url,
+                "caption": message,
+                "access_token": self.access_token
+            }
+            
+            response = requests.post(url, data=data, timeout=60)
+            result = response.json()
+            
+            if "id" in result:
+                return result["id"]
+            elif "error" in result:
+                log_error(f"FB Photo Post Error: {result['error'].get('message', 'Unknown error')}")
+                return None
+            
+            return None
+            
+        except Exception as e:
+            log_error(f"FB post with image URL error: {e}")
+            return None
+    
+    def post_text_only(self, message):
+        """Post text only without image"""
+        try:
+            url = f"{self.base_url}/feed"
+            data = {
+                "message": message,
+                "access_token": self.access_token
+            }
+            
+            response = requests.post(url, data=data, timeout=30)
+            result = response.json()
+            
+            if "id" in result:
+                return result["id"]
+            elif "error" in result:
+                log_error(f"FB Text Post Error: {result['error'].get('message', 'Unknown error')}")
+                return None
+            
+            return None
+            
+        except Exception as e:
+            log_error(f"FB text post error: {e}")
+            return None
+    
+    def post(self, message, image_url="", country="africa", niche="news"):
+        """Main post method with fallback logic"""
+        
+        if not self.access_token or not self.page_id:
+            log_error("Facebook credentials not configured")
+            return None
+        
+        # Step 1: Clean and validate image URL
+        if image_url:
+            cleaned_url = self.clean_image_url(image_url)
+            log_info(f"Cleaned image URL: {cleaned_url[:70]}...")
+            
+            if self.validate_image_url(cleaned_url):
+                log_info("Image URL validated, posting with image...")
+                result = self.post_with_image_url(message, cleaned_url)
+                if result:
+                    log_success(f"Posted with image. Post ID: {result}")
+                    return result
+                else:
+                    log_warning("Image post failed, trying fallback...")
+            else:
+                log_warning("Image URL validation failed")
+        
+        # Step 2: Try fallback image from Unsplash/Pexels
+        fallback_query = f"{country} {niche}".replace("Pan-African", "africa")
+        fallback_url = self.get_fallback_image(fallback_query)
+        
+        if fallback_url:
+            log_info("Attempting post with fallback image...")
+            result = self.post_with_image_url(message, fallback_url)
+            if result:
+                log_success(f"Posted with fallback image. Post ID: {result}")
+                return result
+        
+        # Step 3: Fall back to text-only post
+        log_info("Posting text-only...")
+        result = self.post_text_only(message)
+        
+        if result:
+            log_success(f"Posted text-only. Post ID: {result}")
+            return result
+        
+        log_error("All posting attempts failed")
+        return None
+
+
+fb_poster = FacebookPoster()
+
+============================================================
+FILE: .\processors\post_engine.py
+============================================================
+from utils.database import Database
+from processors.ai_processor import ai_processor
+from processors.facebook_poster import fb_poster
+from processors.content_selector import content_selector
+from utils.logger import log_info, log_error, log_success, log_warning
+
+class PostEngine:
+    def __init__(self):
+        self.db = Database()
+        self.ai = ai_processor
+        self.fb = fb_poster
+        self.selector = content_selector
+
+    def run_single_post(self, schedule=None):
+        """Run a single post cycle"""
+        try:
+            # Get schedule for current hour if not provided
+            if not schedule:
+                schedule = self.db.get_current_schedule()
+            
+            if not schedule:
+                log_info("No schedule for current hour, using defaults")
+                schedule = {
+                    "target_country": "Pan-African",
+                    "target_language": "french",
+                    "target_niche": "politics"
+                }
+            
+            log_info(f"Schedule: {schedule.get('target_country', 'Any')} | {schedule.get('target_language', 'any')} | {schedule.get('target_niche', 'any')}")
+            
+            # Select content based on schedule
+            result = self.selector.select_content(schedule)
+            
+            if not result:
+                log_info("No suitable content found")
+                return False
+            
+            # Handle if result is tuple (content, language) or just content dict
+            if isinstance(result, tuple):
+                content, suggested_language = result
+            else:
+                content = result
+                suggested_language = None
+            
+            if not content:
+                log_info("No suitable content found")
+                return False
+            
+            # Double-check content hasn't been posted already
+            if self.db.is_content_posted(content['id']):
+                log_warning(f"Content {content['id']} already posted, skipping")
+                return False
+            
+            country = content.get('country', 'Pan-African')
+            niche = content.get('niche', 'politics')
+            
+            log_info(f"Selected: [{country}] {content.get('headline', '')[:50]}...")
+            
+            # Determine output language
+            output_language = suggested_language or schedule.get('target_language') or content.get('source_language', 'french')
+            log_info(f"Output language: {output_language}")
+            
+            # Generate post with AI
+            post_text = self.ai.generate_post(
+                headline=content.get('headline', ''),
+                summary=content.get('summary', ''),
+                output_language=output_language,
+                country=country,
+                niche=niche
+            )
+            
+            if not post_text:
+                log_error("Failed to generate post text")
+                return False
+            
+            # Get image URL
+            image_url = content.get('image_url', '')
+            
+            # Mark content as posted BEFORE posting to prevent duplicates
+            self.db.mark_content_posted(content['id'])
+            
+            # Post to Facebook with country and niche for fallback images
+            post_result = self.fb.post(post_text, image_url, country=country, niche=niche)
+            
+            if post_result:
+                # Save to posts table
+                self.db.create_post(
+                    content_id=content['id'],
+                    post_text=post_text,
+                    post_language=output_language,
+                    target_country=country,
+                    niche=niche,
+                    image_used=image_url,
+                    facebook_post_id=post_result
+                )
+                
+                log_success(f"Post cycle completed successfully")
+                return True
+            else:
+                # If posting failed, mark content as failed (not pending)
+                self.db.mark_content_failed(content['id'])
+                log_error("Failed to post to Facebook")
+                return False
+                
+        except Exception as e:
+            log_error(f"Post cycle error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def run_scheduled_post(self):
+        """Run post based on current schedule"""
+        return self.run_single_post()
+
+post_engine = PostEngine()
+
+============================================================
+FILE: .\processors\scraper_runner.py
+============================================================
+from datetime import datetime
+from scrapers.scraper_manager import get_scraper, SCRAPER_MAP
+from utils.database import Database
+from utils.http_helper import fetch_page
+from utils.freshness_filter import FreshnessFilter
+from utils.logger import log_info, log_error, log_success, log_warning
+
+class ScraperRunner:
+    def __init__(self):
+        self.db = Database()
+        self.freshness_filter = FreshnessFilter(max_age_hours=48)
+        
+        # API source names that don't need HTML fetching
+        self.api_sources = ["GNews", "YouTube", "NewsAPI", "Google Trends"]
+    
+    def run_single_source(self, source):
+        """Run scraper for a single source"""
+        try:
+            source_name = source.get("name", "Unknown")
+            
+            # Skip Reddit if still in database
+            if source_name == "Reddit":
+                return 0
+            
+            scraper = get_scraper(source)
+            
+            # For API scrapers, call parse_articles without HTML
+            if source_name in self.api_sources or source.get("source_type") == "api":
+                try:
+                    articles = scraper.parse_articles(None)
+                except Exception as e:
+                    log_warning(f"API scraper {source_name} failed: {e}")
+                    return 0
+            else:
+                # Web scrapers need HTML
+                html = fetch_page(source["url"])
+                if not html:
+                    log_warning(f"Failed to fetch {source_name}")
+                    return 0
+                articles = scraper.parse_articles(html)
+            
+            if not articles:
+                return 0
+            
+            # Apply freshness filter
+            fresh_articles = self.freshness_filter.filter_articles(articles)
+            
+            if not fresh_articles:
+                return 0
+            
+            # Save to database
+            saved = 0
+            for article in fresh_articles:
+                try:
+                    success = self.db.add_content(
+                        source_id=source["id"],
+                        headline=article.get("headline", ""),
+                        summary=article.get("summary", ""),
+                        original_url=article.get("url", ""),
+                        image_url=article.get("image", ""),
+                        source_language=article.get("language", source["language"]),
+                        country=article.get("country", source["country"]),
+                        country_code=article.get("country_code", source["country_code"]),
+                        niche=article.get("niche", source["niche"])
+                    )
+                    if success:
+                        saved += 1
+                except Exception as e:
+                    continue
+            
+            if saved > 0:
+                log_success(f"{source_name}: Saved {saved} articles")
+            
+            # Update last_scraped timestamp
+            self.db.update_source_scraped(source["id"])
+            
+            return saved
+            
+        except Exception as e:
+            log_error(f"Error scraping {source.get('name', 'Unknown')}: {e}")
+            return 0
+    
+    def run_all(self):
+        """Run all active scrapers"""
+        log_info("Starting scraper run...")
+        
+        sources = self.db.get_active_sources()
+        
+        if not sources:
+            log_warning("No active sources found")
+            return 0
+        
+        log_info(f"Running {len(sources)} scrapers...")
+        
+        total_saved = 0
+        successful = 0
+        failed = 0
+        
+        for source in sources:
+            try:
+                saved = self.run_single_source(source)
+                if saved > 0:
+                    successful += 1
+                    total_saved += saved
+                else:
+                    failed += 1
+            except Exception as e:
+                log_error(f"Error with {source.get('name', 'Unknown')}: {e}")
+                failed += 1
+        
+        log_info(f"Scraper run complete: {successful} successful, {failed} failed, {total_saved} articles saved")
+        
+        return total_saved
+    
+    def run_priority_sources(self):
+        """Run only high-priority sources (for quick updates)"""
+        log_info("Running priority sources...")
+        
+        sources = self.db.get_active_sources()
+        priority_sources = [s for s in sources if s.get("priority", 2) == 1]
+        
+        total_saved = 0
+        for source in priority_sources:
+            saved = self.run_single_source(source)
+            total_saved += saved
+        
+        return total_saved
+
+scraper_runner = ScraperRunner()
+
+============================================================
+FILE: .\processors\telegram_reporter.py
+============================================================
+import os
+import requests
+from datetime import datetime, timedelta
+from utils.database import Database
+from utils.fb_analytics import fb_analytics
+from utils.logger import log_info, log_error, log_success
+
+class TelegramReporter:
+    def __init__(self):
+        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '')
+        self.chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
+        self.db = Database()
+        self.analytics = fb_analytics
+    
+    def send_message(self, message):
+        """Send a message to Telegram"""
+        if not self.bot_token or not self.chat_id:
+            log_info("Telegram not configured - skipping report")
+            return False
+        
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            data = {
+                "chat_id": self.chat_id,
+                "text": message,
+                "parse_mode": "HTML"
+            }
+            response = requests.post(url, data=data, timeout=10)
+            
+            if response.status_code == 200:
+                log_success("Telegram report sent")
+                return True
+            else:
+                log_error(f"Telegram error: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            log_error(f"Telegram send error: {e}")
+            return False
+    
+    def generate_daily_report(self):
+        """Generate daily performance report with analytics"""
+        try:
+            today = datetime.utcnow().date()
+            yesterday = today - timedelta(days=1)
+            
+            # Update metrics for recent posts first
+            self.analytics.update_all_recent_posts(hours=48)
+            
+            # Get posts from last 24 hours
+            posts_result = self.db.client.table("posts").select("*").gte(
+                "posted_at", yesterday.isoformat()
+            ).execute()
+            
+            posts = posts_result.data if posts_result.data else []
+            
+            # Count by language
+            french_posts = sum(1 for p in posts if p.get('post_language') == 'french')
+            english_posts = sum(1 for p in posts if p.get('post_language') == 'english')
+            
+            # Count by country
+            countries = {}
+            for p in posts:
+                country = p.get('target_country', 'Unknown')
+                countries[country] = countries.get(country, 0) + 1
+            
+            # Count by niche
+            niches = {}
+            for p in posts:
+                niche = p.get('niche', 'Unknown')
+                niches[niche] = niches.get(niche, 0) + 1
+            
+            # Get engagement metrics
+            total_reach = sum(p.get('reach', 0) or 0 for p in posts)
+            total_engagements = sum(p.get('engagements', 0) or 0 for p in posts)
+            total_reactions = sum(p.get('reactions', 0) or 0 for p in posts)
+            total_comments = sum(p.get('comments', 0) or 0 for p in posts)
+            total_shares = sum(p.get('shares', 0) or 0 for p in posts)
+            
+            # Get pending content count
+            pending_result = self.db.client.table("content").select("id").eq("status", "pending").execute()
+            pending_count = len(pending_result.data) if pending_result.data else 0
+            
+            # Build report
+            report = f"""
+<b>📊 Africa Lens Daily Report</b>
+<b>Date:</b> {today.isoformat()}
+
+<b>📝 Posts Last 24h:</b> {len(posts)}
+• French: {french_posts} ({french_posts*100//max(len(posts),1)}%)
+• English: {english_posts} ({english_posts*100//max(len(posts),1)}%)
+
+<b>📈 Engagement:</b>
+• Reach: {total_reach:,}
+• Engagements: {total_engagements:,}
+• Reactions: {total_reactions:,}
+• Comments: {total_comments:,}
+• Shares: {total_shares:,}
+
+<b>🌍 By Country:</b>
+"""
+            for country, count in sorted(countries.items(), key=lambda x: -x[1])[:5]:
+                report += f"• {country}: {count}\n"
+            
+            report += f"\n<b>📰 By Niche:</b>\n"
+            for niche, count in sorted(niches.items(), key=lambda x: -x[1]):
+                report += f"• {niche}: {count}\n"
+            
+            report += f"\n<b>📦 Pending Content:</b> {pending_count}"
+            
+            # Warnings
+            if len(posts) < 20:
+                report += f"\n\n⚠️ Low post count (target: 24/day)"
+            
+            if pending_count < 30:
+                report += f"\n⚠️ Low content queue - run scraper"
+            
+            # Best performing niche
+            if niches:
+                best_niche = max(niches.items(), key=lambda x: x[1])[0]
+                report += f"\n\n🏆 <b>Top Niche:</b> {best_niche}"
+            
+            report += f"\n\n✅ Bot is running normally"
+            
+            return report
+            
+        except Exception as e:
+            log_error(f"Report generation error: {e}")
+            return f"❌ Error generating report: {e}"
+    
+    def send_daily_report(self):
+        """Generate and send daily report"""
+        report = self.generate_daily_report()
+        return self.send_message(report)
+    
+    def send_startup_message(self):
+        """Send message when bot starts"""
+        message = f"""
+🚀 <b>Africa Lens Bot Started</b>
+Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC
+
+Bot is now running and will post hourly.
+Daily reports will be sent at midnight UTC.
+"""
+        return self.send_message(message)
+    
+    def send_error_alert(self, error_message):
+        """Send error alert"""
+        message = f"""
+🚨 <b>Africa Lens Bot Error</b>
+Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC
+
+{error_message}
+"""
+        return self.send_message(message)
+    
+    def send_weekly_report(self):
+        """Send weekly performance summary"""
+        try:
+            report_data = self.analytics.get_performance_report(days=7)
+            
+            if not report_data or isinstance(report_data, str):
+                return False
+            
+            message = f"""
+<b>📊 Africa Lens Weekly Report</b>
+
+<b>📝 Overview:</b>
+• Total Posts: {report_data['total_posts']}
+• Total Reach: {report_data['total_reach']:,}
+• Total Engagements: {report_data['total_engagements']:,}
+• Avg Reach/Post: {report_data['avg_reach_per_post']:,}
+
+<b>🌍 Top Languages:</b>
+"""
+            for lang, stats in report_data['by_language'].items():
+                avg = stats['reach'] // stats['posts'] if stats['posts'] else 0
+                message += f"• {lang.upper()}: {stats['posts']} posts, {avg:,} avg reach\n"
+            
+            message += f"\n<b>🗺️ Top Countries:</b>\n"
+            for country, stats in list(report_data['by_country'].items())[:5]:
+                message += f"• {country}: {stats['reach']:,} reach\n"
+            
+            message += f"\n<b>📰 Best Niches:</b>\n"
+            sorted_niches = sorted(report_data['by_niche'].items(), key=lambda x: x[1]['reach'], reverse=True)
+            for niche, stats in sorted_niches[:3]:
+                message += f"• {niche}: {stats['reach']:,} reach\n"
+            
+            return self.send_message(message)
+            
+        except Exception as e:
+            log_error(f"Weekly report error: {e}")
+            return False
+
+
+telegram_reporter = TelegramReporter()
+
+============================================================
+FILE: .\processors\__init__.py
+============================================================
+
+
+============================================================
+FILE: .\scrapers\abidjan_net.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class AbidjanNetScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        containers = soup.select("div.grd-item")
+
+        for item in containers[:15]:
+            try:
+                headline_tag = item.select_one("a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                if len(headline) < 20:
+                    continue
+                    
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                summary = ""
+                summary_tag = item.select_one("p, .excerpt, .desc")
+                if summary_tag:
+                    summary = self.clean_text(summary_tag.get_text())
+
+                image = ""
+                img_tag = item.select_one("img")
+                if img_tag:
+                    image = img_tag.get("src") or ""
+                    if image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\actualite_cd.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class ActualiteCDScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        # Target views-row containers
+        containers = soup.select(".views-row")
+
+        for item in containers[:15]:
+            try:
+                # Headline from h4 a or h3 a
+                headline_tag = item.select_one("h4 a, h3 a, h2 a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                # Summary - category can serve as context
+                summary = ""
+                category_tag = item.select_one("span a, .color1 a")
+                if category_tag:
+                    summary = self.clean_text(category_tag.get_text())
+
+                # Image from img with src (relative URL)
+                image = ""
+                img_tag = item.select_one("img")
+                if img_tag:
+                    image = img_tag.get("src") or ""
+                    if image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\allafrica.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+import time
+import re
+import random
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
+
+class AllAfricaScraper(BaseScraper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.base_url = "https://allafrica.com"
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        ]
+        
+    def get_random_headers(self):
+        return {
+            'User-Agent': random.choice(self.user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Referer': 'https://allafrica.com/',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+        }
+
+    def clean_text(self, text):
+        """Clean up text by removing extra whitespace and newlines"""
+        if not text:
+            return ""
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+        
+    def make_absolute_url(self, url):
+        """Convert relative URLs to absolute"""
+        if not url:
+            return ""
+        if url.startswith(('http://', 'https://')):
+            return url
+        return urljoin(self.base_url, url)
+
+    def parse_articles(self, html):
+        """Parse articles from the AllAfrica homepage"""
+        soup = self.get_soup(html)
+        articles = []
+        
+        # Try multiple selectors to find article containers
+        article_containers = []
+        
+        # Try different container selectors
+        container_selectors = [
+            'article.story', 
+            'div.story', 
+            'div.feed-article', 
+            'div.story-item', 
+            'div.item',
+            'div.article',
+            'div.article-card',
+            'div.article-item',
+            'div.article-wrapper',
+            'div.news-item',
+            'div.news-card',
+            'div.news-wrapper',
+            'div.post',
+            'div.entry',
+            'div.article-listing',
+            'div.news-listing',
+            'div.view-content div.views-row',
+            'div.content div.node',
+            'div.region-content article',
+            'main article',
+            'div#main-content article',
+            'div#content article',
+            'div#main article',
+            'div#content-inner article',
+            'div#main-inner article',
+            'section.article-list article',
+            'section.news-list article',
+            'div.article-list article',
+            'div.news-list article',
+        ]
+        
+        # Try each selector until we find some containers
+        for selector in container_selectors:
+            containers = soup.select(selector)
+            if containers:
+                article_containers.extend(containers)
+                if len(article_containers) >= 10:  # Don't need too many containers
+                    article_containers = article_containers[:10]
+                    break
+        
+        # If still no containers, try to find any article-like elements
+        if not article_containers:
+            article_containers = soup.find_all(['article', 'div'], class_=re.compile(r'(story|article|news|post|entry|item)', re.I))
+        
+        for container in article_containers[:15]:  # Slightly more in case some fail
+            try:
+                # Try multiple selectors for headline and URL
+                headline_elem = None
+                headline_selectors = [
+                    'h3 a', 'h2 a', 'h4 a', 'h1 a',  # Headings with links
+                    'a.headline', 'a.title', 'a.story-link',  # Common link classes
+                    'a[itemprop="url"]',  # Schema.org markup
+                    'h3', 'h2', 'h4',  # Just headings
+                    'a'  # Fallback to any link
+                ]
+                
+                # Try each selector until we find a good one
+                for selector in headline_selectors:
+                    elem = container.select_one(selector)
+                    if elem and self.clean_text(elem.get_text()):
+                        headline_elem = elem
+                        break
+                
+                if not headline_elem:
+                    continue
+                
+                # Get headline text
+                headline = self.clean_text(headline_elem.get_text())
+                if not headline or len(headline) < 15:  # Slightly shorter minimum length
+                    continue
+                
+                # Get URL (either from the element or its parent)
+                article_url = ''
+                if headline_elem.name == 'a':
+                    article_url = headline_elem.get('href', '')
+                else:
+                    # If it's a heading, try to find a link near it
+                    link = headline_elem.find_parent('a') or headline_elem.find_next_sibling('a')
+                    if link and link.get('href'):
+                        article_url = link['href']
+                
+                # Clean and validate URL
+                if not article_url or article_url.startswith(('javascript:', 'mailto:', 'tel:', '#')):
+                    continue
+                    
+                article_url = self.make_absolute_url(article_url)
+                
+                # Extract summary using multiple possible selectors
+                summary = ""
+                summary_selectors = [
+                    'p.summary', 'div.summary', 'p.snippet', 'div.article-summary', 
+                    'p.story-body', 'div.story-body p', 'p.article-summary',
+                    'div.excerpt', 'p.excerpt', 'div.description', 'p.description',
+                    'div.entry-summary', 'p.entry-summary', 'div.entry-content p',
+                    'p.article-snippet', 'div.article-snippet', 'p.dek', 'div.dek',
+                    'p.lead', 'div.lead', 'p.article-lead', 'div.article-lead',
+                    'p.article-intro', 'div.article-intro', 'p.intro', 'div.intro'
+                ]
+                
+                # Try each summary selector
+                for selector in summary_selectors:
+                    summary_elems = container.select(selector)
+                    if summary_elems:
+                        summary = ' '.join([self.clean_text(p.get_text()) for p in summary_elems])
+                        if len(summary) > 20:  # Only use if we have enough text
+                            break
+                
+                # If no summary found, try to get first few paragraphs
+                if not summary:
+                    paragraphs = container.find_all('p')
+                    if paragraphs:
+                        summary = ' '.join([self.clean_text(p.get_text()) for p in paragraphs[:2]])
+                
+                # Extract image URL with multiple fallbacks
+                image_url = ""
+                img_selectors = [
+                    'img[src]', 'img[data-src]', 'img[data-lazy-src]',
+                    'div.image img', 'figure img', 'picture source',
+                    'div.thumbnail img', 'div.media img', 'div.image-container img'
+                ]
+                
+                for selector in img_selectors:
+                    img_elem = container.select_one(selector)
+                    if img_elem:
+                        image_url = img_elem.get('data-src') or img_elem.get('src') or img_elem.get('data-lazy-src', '')
+                        if image_url:
+                            # Clean up image URL
+                            image_url = image_url.split('?')[0].split('#')[0]
+                            image_url = self.make_absolute_url(image_url)
+                            break
+                
+                # Add the article to our list (without full text for now)
+                article_data = {
+                    'headline': headline[:200],  # Limit headline length
+                    'url': article_url,
+                    'summary': summary[:500],    # Limit summary length
+                    'image': image_url,
+                    'full_text': None  # We're not fetching full text for now
+                }
+                
+                articles.append(article_data)
+                
+                # Be nice to the server (shorter delay since we're not fetching full content)
+                time.sleep(0.1)
+                
+            except Exception as e:
+                print(f"Error parsing article: {e}")
+                continue
+                
+        return articles
+        
+    def fetch_full_article(self, url):
+        """Stub method - we're not fetching full articles right now"""
+        return None
+
+============================================================
+FILE: .\scrapers\api_scrapers.py
+============================================================
+import os
+import requests
+from datetime import datetime
+from scrapers.base_scraper import BaseScraper
+from utils.logger import log_info, log_warning
+
+class GNewsAPIScraper(BaseScraper):
+    """Scraper for GNews API - African news in French and English"""
+    
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        super().__init__(source_id, name, url, country, country_code, language, niche)
+        self.api_key = os.getenv("GNEWS_KEY", "")
+        self.base_url = "https://gnews.io/api/v4"
+    
+    def parse_articles(self, html=None):
+        """Fetch articles from GNews API"""
+        if not self.api_key:
+            return []
+        
+        articles = []
+        
+        queries = [
+            {"q": "afrique", "lang": "fr"},
+            {"q": "africa", "lang": "en"},
+            {"q": "senegal OR mali OR burkina", "lang": "fr"},
+            {"q": "nigeria OR kenya OR ghana", "lang": "en"},
+        ]
+        
+        seen_urls = set()
+        
+        for query_params in queries:
+            try:
+                url = f"{self.base_url}/search?q={query_params['q']}&lang={query_params['lang']}&max=10&token={self.api_key}"
+                response = requests.get(url, timeout=15)
+                
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                
+                for item in data.get("articles", []):
+                    article_url = item.get("url", "")
+                    
+                    if article_url in seen_urls:
+                        continue
+                    seen_urls.add(article_url)
+                    
+                    title = item.get("title", "")
+                    desc = item.get("description", "")
+                    content_text = (title + " " + desc).lower()
+                    
+                    country = "Pan-African"
+                    country_code = "Pan"
+                    
+                    country_keywords = {
+                        "nigeria": ("Nigeria", "NG"),
+                        "kenya": ("Kenya", "KE"),
+                        "senegal": ("Senegal", "SN"),
+                        "mali": ("Mali", "ML"),
+                        "burkina": ("Burkina Faso", "BF"),
+                        "congo": ("DRC", "CD"),
+                        "burundi": ("Burundi", "BI"),
+                        "ghana": ("Ghana", "GH"),
+                        "south africa": ("South Africa", "ZA"),
+                        "morocco": ("Morocco", "MA"),
+                    }
+                    
+                    for keyword, (country_name, code) in country_keywords.items():
+                        if keyword in content_text:
+                            country = country_name
+                            country_code = code
+                            break
+                    
+                    articles.append({
+                        "headline": title,
+                        "summary": desc or "",
+                        "url": article_url,
+                        "image": item.get("image", ""),
+                        "country": country,
+                        "country_code": country_code,
+                        "language": query_params["lang"],
+                        "published_at": item.get("publishedAt", ""),
+                    })
+                    
+                    if len(articles) >= 15:
+                        break
+                        
+            except Exception as e:
+                continue
+            
+            if len(articles) >= 15:
+                break
+        
+        return articles[:15]
+
+
+class YouTubeAPIScraper(BaseScraper):
+    """Scraper for YouTube Data API - African news videos"""
+    
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        super().__init__(source_id, name, url, country, country_code, language, niche)
+        self.api_key = os.getenv("YOUTUBE_API_KEY", "")
+        self.base_url = "https://www.googleapis.com/youtube/v3"
+    
+    def parse_articles(self, html=None):
+        """Fetch videos from YouTube API"""
+        if not self.api_key:
+            return []
+        
+        articles = []
+        
+        queries = [
+            ("actualites afrique", "fr"),
+            ("africa news today", "en"),
+            ("nigeria news", "en"),
+        ]
+        
+        seen_ids = set()
+        
+        for query, lang in queries:
+            try:
+                url = f"{self.base_url}/search?part=snippet&q={query}&type=video&maxResults=5&order=date&key={self.api_key}"
+                response = requests.get(url, timeout=15)
+                
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                
+                for item in data.get("items", []):
+                    video_id = item.get("id", {}).get("videoId", "")
+                    
+                    if video_id in seen_ids:
+                        continue
+                    seen_ids.add(video_id)
+                    
+                    snippet = item.get("snippet", {})
+                    
+                    articles.append({
+                        "headline": snippet.get("title", ""),
+                        "summary": snippet.get("description", "")[:500],
+                        "url": f"https://www.youtube.com/watch?v={video_id}",
+                        "image": snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
+                        "country": "Pan-African",
+                        "country_code": "Pan",
+                        "language": lang,
+                        "published_at": snippet.get("publishedAt", ""),
+                    })
+                    
+                    if len(articles) >= 10:
+                        break
+                        
+            except Exception as e:
+                continue
+            
+            if len(articles) >= 10:
+                break
+        
+        return articles[:10]
+
+
+class NewsAPIScraper(BaseScraper):
+    """Scraper for NewsAPI - African news"""
+    
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        super().__init__(source_id, name, url, country, country_code, language, niche)
+        self.api_key = os.getenv("NEWSAPI_KEY", "")
+        self.base_url = "https://newsapi.org/v2"
+    
+    def parse_articles(self, html=None):
+        """Fetch articles from NewsAPI"""
+        if not self.api_key:
+            return []
+        
+        articles = []
+        seen_urls = set()
+        
+        queries = [
+            ("africa", "en"),
+            ("nigeria", "en"),
+            ("kenya", "en"),
+            ("south africa", "en"),
+        ]
+        
+        for query, lang in queries:
+            try:
+                url = f"{self.base_url}/everything?q={query}&language={lang}&pageSize=5&sortBy=publishedAt&apiKey={self.api_key}"
+                response = requests.get(url, timeout=15)
+                
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                
+                for item in data.get("articles", []):
+                    article_url = item.get("url", "")
+                    
+                    if article_url in seen_urls:
+                        continue
+                    seen_urls.add(article_url)
+                    
+                    title = item.get("title", "")
+                    if not title or title == "[Removed]":
+                        continue
+                    
+                    content_text = (title + " " + (item.get("description") or "")).lower()
+                    
+                    country = "Pan-African"
+                    country_code = "Pan"
+                    
+                    country_keywords = {
+                        "nigeria": ("Nigeria", "NG"),
+                        "kenya": ("Kenya", "KE"),
+                        "ghana": ("Ghana", "GH"),
+                        "south africa": ("South Africa", "ZA"),
+                        "egypt": ("Egypt", "EG"),
+                    }
+                    
+                    for keyword, (country_name, code) in country_keywords.items():
+                        if keyword in content_text:
+                            country = country_name
+                            country_code = code
+                            break
+                    
+                    articles.append({
+                        "headline": title,
+                        "summary": item.get("description", "") or "",
+                        "url": article_url,
+                        "image": item.get("urlToImage", ""),
+                        "country": country,
+                        "country_code": country_code,
+                        "language": lang,
+                        "published_at": item.get("publishedAt", ""),
+                    })
+                    
+                    if len(articles) >= 15:
+                        break
+                        
+            except Exception as e:
+                continue
+            
+            if len(articles) >= 15:
+                break
+        
+        return articles[:15]
+
+
+class GoogleTrendsScraper(BaseScraper):
+    """Scraper for Google Trends - Trending in Africa"""
+    
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        super().__init__(source_id, name, url, country, country_code, language, niche)
+    
+    def parse_articles(self, html=None):
+        """Fetch trending topics from Google Trends"""
+        try:
+            from pytrends.request import TrendReq
+            
+            pytrends = TrendReq(hl='en-US', tz=0)
+            
+            articles = []
+            countries = [
+                ("south_africa", "South Africa", "ZA"),
+                ("nigeria", "Nigeria", "NG"),
+                ("kenya", "Kenya", "KE"),
+            ]
+            
+            for geo, country_name, code in countries:
+                try:
+                    trending = pytrends.trending_searches(pn=geo)
+                    
+                    for idx, topic in enumerate(trending[0].tolist()[:3]):
+                        articles.append({
+                            "headline": f"Trending: {topic}",
+                            "summary": f"Currently trending in {country_name}",
+                            "url": f"https://trends.google.com/trends/explore?geo={code}&q={topic}",
+                            "image": "",
+                            "country": country_name,
+                            "country_code": code,
+                            "language": "english",
+                        })
+                except Exception:
+                    continue
+            
+            return articles[:10]
+            
+        except ImportError:
+            return []
+        except Exception as e:
+            return []
+
+============================================================
+FILE: .\scrapers\base_scraper.py
+============================================================
+from abc import ABC, abstractmethod
+from bs4 import BeautifulSoup
+from utils.http_helper import fetch_page, extract_og_image
+from utils.database import Database
+from utils.logger import log_info, log_error, log_scrape, log_warning
+from utils.image_finder import get_stock_image
+
+class GenericScraper(ABC):
+    """A generic scraper that can be used as a fallback for any source"""
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        self.source_id = source_id
+        self.name = name
+        self.url = url
+        self.country = country
+        self.country_code = country_code
+        self.language = language
+        self.niche = niche
+    
+    def parse_articles(self, html):
+        """
+        Parse the HTML to extract article information.
+        This is a generic implementation that can be overridden by specific scrapers.
+        """
+        soup = self.get_soup(html)
+        articles = []
+        
+        # Look for common article selectors
+        article_selectors = [
+            'article',
+            '.article',
+            '.post',
+            '.entry',
+            '.news-item',
+            'div[itemprop="articleBody"]',
+            'div.article-body',
+            'div.post-content'
+        ]
+        
+        for selector in article_selectors:
+            articles = soup.select(selector)
+            if articles:
+                break
+                
+        if not articles:
+            # If no articles found with specific selectors, try to find any links with text
+            links = soup.select('a')
+            articles = [link for link in links if len(link.get_text(strip=True)) > 50]
+            
+        return articles or []
+    
+    def scrape(self):
+        """Default implementation of the scrape method"""
+        log_info(f"Scraping {self.name} (using generic scraper)...")
+        html = fetch_page(self.url)
+        if not html:
+            log_error(f"Failed to fetch {self.name}")
+            return []
+            
+        articles = self.parse_articles(html)
+        return articles
+
+class BaseScraper(GenericScraper):
+    def __init__(self, source_id, name, url, country, country_code, language, niche):
+        self.source_id = source_id
+        self.name = name
+        self.url = url
+        self.country = country
+        self.country_code = country_code
+        self.language = language
+        self.niche = niche
+    
+    @abstractmethod
+    def parse_articles(self, html):
+        pass
+    
+    def scrape(self):
+        log_info(f"Scraping {self.name}...")
+        html = fetch_page(self.url)
+        if not html:
+            log_error(f"Failed to fetch {self.name}")
+            return []
+        
+        articles = self.parse_articles(html)
+        saved_count = 0
+        
+        for article in articles:
+            if not article.get("headline"):
+                continue
+            
+            # Check if exists before fetching body to save requests
+            if db.content_exists(article.get("headline", "")):
+                continue
+
+            # Fetch full article details (text + high-res image)
+            full_text, og_image = self.fetch_full_details(article.get("url", ""))
+            
+            # Use full text if found, otherwise fall back to excerpt
+            final_summary = full_text if full_text and len(full_text) > 200 else article.get("summary", "")
+            
+            # Use OG image if list-page image is missing/broken
+            final_image = article.get("image", "")
+            if (not final_image or "base64" in final_image) and og_image:
+                final_image = og_image
+            
+            # LAST RESORT: Stock Image Fallback
+            if not final_image or "base64" in final_image:
+                stock_img = get_stock_image(article.get("headline", ""))
+                if stock_img:
+                    final_image = stock_img
+                    log_info(f"Using stock image for: {article.get('headline')[:20]}...")
+
+            result = db.add_content(
+                source_id=self.source_id,
+                headline=article.get("headline", ""),
+                summary=final_summary, 
+                original_url=article.get("url", ""),
+                image_url=final_image,
+                source_language=self.language,
+                country=self.country,
+                country_code=self.country_code,
+                niche=self.niche
+            )
+            
+            if result:
+                saved_count += 1
+                from time import sleep
+                sleep(2) 
+        
+        db.update_source_scraped(self.source_id)
+        log_scrape(self.name, saved_count)
+        return saved_count
+
+    def fetch_full_details(self, url):
+        """Fetches full text and og:image from the article URL."""
+        if not url:
+            return "", ""
+        try:
+            html = fetch_page(url)
+            if not html:
+                return "", ""
+            soup = self.get_soup(html)
+            
+            # 1. Extract Body Text
+            body_container = soup.select_one("article, div.article-body, div.post-content, div.entry-content, div#content, div.content")
+            if body_container:
+                paragraphs = body_container.find_all("p")
+            else:
+                paragraphs = soup.find_all("p")
+            
+            text_blocks = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 40]
+            body_text = "\n\n".join(text_blocks)
+            
+            # 2. Extract OpenGraph Image (High Quality)
+            og_image = extract_og_image(soup)
+            if og_image:
+                og_image = self.make_absolute_url(og_image)
+            
+            return body_text, og_image
+            
+        except Exception as e:
+            log_warning(f"Could not fetch details for {url}: {e}")
+            return "", ""
+    
+    def get_soup(self, html):
+        return BeautifulSoup(html, "lxml")
+    
+    def clean_text(self, text):
+        if not text:
+            return ""
+        return " ".join(text.strip().split())
+    
+    def make_absolute_url(self, relative_url):
+        if not relative_url:
+            return ""
+        if relative_url.startswith("http"):
+            return relative_url
+        if relative_url.startswith("//"):
+            return "https:" + relative_url
+        if relative_url.startswith("/"):
+            base = self.url.rstrip("/")
+            return base + relative_url
+        return self.url.rstrip("/") + "/" + relative_url
+
+
+============================================================
+FILE: .\scrapers\burkina24.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class Burkina24Scraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        # Target the actual article containers
+        post_items = soup.select(".post-item")
+
+        for item in post_items[:15]:
+            try:
+                # Headline from h2.post-title a
+                headline_tag = item.select_one("h2.post-title a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                # Summary from p.post-excerpt
+                summary = ""
+                summary_tag = item.select_one("p.post-excerpt")
+                if summary_tag:
+                    summary = self.clean_text(summary_tag.get_text())
+
+                # Image from img.wp-post-image with data-lazy-src
+                image = ""
+                img_tag = item.select_one("img.wp-post-image")
+                if img_tag:
+                    # Priority: data-lazy-src > data-src > src
+                    image = (
+                        img_tag.get("data-lazy-src") or 
+                        img_tag.get("data-src") or 
+                        img_tag.get("src") or 
+                        ""
+                    )
+                    # Skip placeholder SVGs
+                    if image.startswith("data:image"):
+                        image = ""
+                    else:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\fratmat.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class FratmatScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+        seen_urls = set()
+
+        # Target ALL article container types
+        selectors = [
+            "div.relative.content",
+            "div.article-one",
+            "div.article-two",
+            "div.article-div2",
+            "div.article-div3",
+            "div.hp_main_article",
+            "div[class*='article-']",
+            "article",
+            "div.item",
+            "div.col-md-3",
+            "div.col-md-4",
+            "div.col-12"
+        ]
+        
+        containers = []
+        for selector in selectors:
+            containers.extend(soup.select(selector))
+
+        for item in containers:
+            if len(articles) >= 15:
+                break
+
+            try:
+                # Find headline link
+                headline_tag = item.select_one("a.article-title")
+                if not headline_tag:
+                    # Fallback: find link with /article/ in href
+                    for a in item.select("a[href*='/article/']"):
+                        text = a.get_text().strip()
+                        if len(text) > 20:
+                            headline_tag = a
+                            break
+                
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                if len(headline) < 20:
+                    continue
+                    
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+                
+                # Skip duplicates
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+
+                summary = ""
+
+                # Image from img.lazy with data-src
+                image = ""
+                img_tag = item.select_one("img.lazy, img")
+                if img_tag:
+                    image = img_tag.get("data-src") or img_tag.get("src") or ""
+                    if image.startswith("data:") or "no-image" in image:
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\generic_scraper.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+from utils.http_helper import fetch_page
+from utils.logger import log_info, log_warning
+
+class GenericScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+        seen_urls = set()
+
+        for a in soup.select("a[href]"):
+            text = a.get_text().strip()
+            href = a.get("href", "")
+            
+            if len(text) < 25 or len(text) > 200:
+                continue
+            if href in seen_urls:
+                continue
+            if any(x in text.lower() for x in [
+                "cookie", "privacy", "subscribe", "contact", "menu", 
+                "lire la suite", "read more", "en savoir plus", "aller au contenu",
+                "newsletter", "login", "sign in", "recherche", "abonnez",
+                "recevez", "suivez", "partager"
+            ]):
+                continue
+            
+            seen_urls.add(href)
+            url = self.make_absolute_url(href)
+            
+            # Look for image in parent containers
+            image = ""
+            el = a
+            for _ in range(5):
+                el = el.find_parent()
+                if not el:
+                    break
+                img = el.select_one("img")
+                if img:
+                    src = img.get("data-lazy-src") or img.get("data-src") or img.get("src") or ""
+                    if src and not src.startswith("data:") and "logo" not in src.lower() and "icon" not in src.lower():
+                        image = self.make_absolute_url(src)
+                        break
+            
+            # Look for summary in same parent container
+            summary = ""
+            el = a
+            for _ in range(3):
+                el = el.find_parent()
+                if not el:
+                    break
+                for selector in ["p", ".excerpt", ".summary", ".description", ".desc", ".chapo"]:
+                    p = el.select_one(selector)
+                    if p and p != a and len(p.get_text().strip()) > 30:
+                        summary = self.clean_text(p.get_text())[:500]
+                        break
+                if summary:
+                    break
+            
+            headline = self.clean_text(text)
+            
+            if headline and len(headline) > 15:
+                articles.append({
+                    "headline": headline,
+                    "summary": summary,
+                    "url": url,
+                    "image": image
+                })
+            
+            if len(articles) >= 15:
+                break
+
+        return articles
+    
+    def fetch_article_content(self, url):
+        """Fetch full article content for AI generation"""
+        try:
+            html = fetch_page(url)
+            if not html:
+                return ""
+            
+            soup = self.get_soup(html)
+            
+            # 1. Try meta description first (most reliable)
+            for meta_sel in ['meta[property="og:description"]', 'meta[name="description"]']:
+                meta = soup.select_one(meta_sel)
+                if meta:
+                    desc = meta.get("content", "").strip()
+                    if len(desc) > 50:
+                        return desc[:1000]
+            
+            # Remove unwanted elements
+            for tag in soup.select("script, style, nav, header, footer, aside, .ads, .advertisement, .social-share, .comments, .related"):
+                tag.decompose()
+            
+            # 2. Try common article content selectors
+            content_selectors = [
+                ".field-name-body p",
+                ".field--name-body p",
+                ".article-content p",
+                "article .content p", 
+                ".post-content p", 
+                ".entry-content p",
+                ".story-body p",
+                ".article-body p",
+                "article p",
+                "main p"
+            ]
+            
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                if elements:
+                    paragraphs = []
+                    for el in elements[:5]:
+                        text = el.get_text().strip()
+                        # Skip short or boilerplate paragraphs
+                        if len(text) > 40 and not any(x in text.lower() for x in ["cookie", "subscribe", "copyright", "fm:", "publi"]):
+                            paragraphs.append(text)
+                    if paragraphs:
+                        content = " ".join(paragraphs)
+                        if len(content) > 100:
+                            return content[:1500]
+            
+            # 3. Fallback: get first substantial paragraphs
+            paragraphs = soup.select("p")
+            good_paragraphs = []
+            for p in paragraphs:
+                text = p.get_text().strip()
+                if 50 < len(text) < 1000:
+                    if not any(x in text.lower() for x in ["cookie", "subscribe", "copyright", "fm:", "publi"]):
+                        good_paragraphs.append(text)
+                if len(good_paragraphs) >= 3:
+                    break
+            
+            if good_paragraphs:
+                return " ".join(good_paragraphs)[:1500]
+            
+            return ""
+            
+        except Exception as e:
+            return ""
+    
+    def enrich_article(self, article):
+        """Fetch article page to get summary if missing"""
+        if article.get("summary") and len(article["summary"]) > 50:
+            return article
+        
+        content = self.fetch_article_content(article["url"])
+        if content:
+            article["summary"] = content[:500]
+        
+        return article
+
+============================================================
+FILE: .\scrapers\iwacu.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class IWACUScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        # Strategy 1: Find div.titraille and get parent with image
+        titrailles = soup.select("div.titraille")
+        
+        for titraille in titrailles[:15]:
+            try:
+                # Get headline from h2 a
+                headline_tag = titraille.select_one("h2 a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                # Category as summary
+                summary = ""
+                category_tag = titraille.select_one("h3 a")
+                if category_tag:
+                    summary = self.clean_text(category_tag.get_text())
+
+                # Image from parent container
+                image = ""
+                parent = titraille.find_parent("div")
+                if parent:
+                    img_tag = parent.select_one("img.wp-post-image, img")
+                    if img_tag:
+                        image = img_tag.get("src") or img_tag.get("data-src") or ""
+                        if image.startswith("data:"):
+                            image = ""
+                        else:
+                            image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        # Strategy 2: Also check article containers as fallback
+        if len(articles) < 5:
+            article_containers = soup.select("article, .post")
+            for item in article_containers[:10]:
+                try:
+                    headline_tag = item.select_one("h2 a, h3 a")
+                    if not headline_tag:
+                        continue
+                    
+                    headline = self.clean_text(headline_tag.get_text())
+                    
+                    # Skip if already found
+                    if any(a["headline"] == headline for a in articles):
+                        continue
+                    
+                    url = headline_tag.get("href", "")
+                    url = self.make_absolute_url(url)
+
+                    summary = ""
+                    img_tag = item.select_one("img")
+                    image = ""
+                    if img_tag:
+                        image = img_tag.get("src") or img_tag.get("data-src") or ""
+                        if not image.startswith("data:"):
+                            image = self.make_absolute_url(image)
+                        else:
+                            image = ""
+
+                    if headline and len(headline) > 15:
+                        articles.append({
+                            "headline": headline,
+                            "summary": summary[:500],
+                            "url": url,
+                            "image": image
+                        })
+                except Exception:
+                    continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\jeune_afrique.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class JeuneAfriqueScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        # Only target article containers that have images
+        # Exclude: thumbnail--sm, thumbnail--x-sm (text-only)
+        selectors = [
+            "article.thumbnail--lg",
+            "article.thumbnail--lg-title",
+            "article.thumbnail--lg-trans",
+            "article.thumbnail--md-title",
+            "article.thumbnail--md-trans",
+            "article.thumbnail--folder",
+        ]
+        
+        containers = []
+        for selector in selectors:
+            containers.extend(soup.select(selector))
+
+        for item in containers[:15]:
+            try:
+                # Headline from h4, h3, or h2
+                headline_tag = item.select_one("h4.thumbnail__title a, h3.thumbnail__title a, h2 a, h3 a, h4 a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                # Summary from excerpt if available
+                summary = ""
+                summary_tag = item.select_one(".thumbnail__excerpt, .excerpt, p")
+                if summary_tag:
+                    summary = self.clean_text(summary_tag.get_text())
+
+                # Image from img tag
+                image = ""
+                img_tag = item.select_one("img")
+                if img_tag:
+                    image = img_tag.get("src") or ""
+                    if image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\maliactu.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class MaliActuScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        containers = soup.select("li")
+
+        for item in containers:
+            if len(articles) >= 15:
+                break
+                
+            try:
+                headline_tag = item.select_one("a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                if len(headline) < 25:
+                    continue
+                    
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                summary = ""
+                summary_tag = item.select_one("p, .excerpt")
+                if summary_tag:
+                    summary = self.clean_text(summary_tag.get_text())
+
+                image = ""
+                img_tag = item.select_one("img")
+                if img_tag:
+                    image = img_tag.get("data-src") or img_tag.get("src") or ""
+                    if image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\punch.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class PunchScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        # Target article containers
+        containers = soup.select("article")
+
+        for item in containers[:15]:
+            try:
+                # Headline from h2.post-title a
+                headline_tag = item.select_one("h2.post-title a, h3.post-title a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                # Summary - not present in listing
+                summary = ""
+
+                # Image from img with data-src (NOT src - that's placeholder)
+                image = ""
+                img_tag = item.select_one("img.img-lazy-load, img")
+                if img_tag:
+                    # Priority: data-src over src (src is placeholder)
+                    image = img_tag.get("data-src") or ""
+                    # Skip if it's the old placeholder
+                    if "2021/05" in image or image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\scraper_manager.py
+============================================================
+from scrapers.jeune_afrique import JeuneAfriqueScraper
+from scrapers.actualite_cd import ActualiteCDScraper
+from scrapers.iwacu import IWACUScraper
+from scrapers.punch import PunchScraper
+from scrapers.burkina24 import Burkina24Scraper
+from scrapers.abidjan_net import AbidjanNetScraper
+from scrapers.fratmat import FratmatScraper
+from scrapers.allafrica import AllAfricaScraper
+from scrapers.maliactu import MaliActuScraper
+from scrapers.seneweb import SenewebScraper
+from scrapers.generic_scraper import GenericScraper
+from scrapers.api_scrapers import GNewsAPIScraper, YouTubeAPIScraper, NewsAPIScraper, GoogleTrendsScraper
+from utils.logger import log_warning
+
+SCRAPER_MAP = {
+    # Custom web scrapers
+    "Jeune Afrique": JeuneAfriqueScraper,
+    "Actualite.cd": ActualiteCDScraper,
+    "IWACU": IWACUScraper,
+    "Punch": PunchScraper,
+    "Burkina 24": Burkina24Scraper,
+    "Abidjan.net": AbidjanNetScraper,
+    "Fratmat": FratmatScraper,
+    "AllAfrica": AllAfricaScraper,
+    "Maliactu": MaliActuScraper,
+    "Seneweb": SenewebScraper,
+    # API scrapers
+    "GNews": GNewsAPIScraper,
+    "YouTube": YouTubeAPIScraper,
+    "NewsAPI": NewsAPIScraper,
+    "Google Trends": GoogleTrendsScraper,
+}
+
+def get_scraper(source):
+    scraper_class = SCRAPER_MAP.get(source["name"], GenericScraper)
+
+    return scraper_class(
+        source_id=source["id"],
+        name=source["name"],
+        url=source["url"],
+        country=source["country"],
+        country_code=source["country_code"],
+        language=source["language"],
+        niche=source["niche"]
+    )
+
+============================================================
+FILE: .\scrapers\seneweb.py
+============================================================
+from scrapers.base_scraper import BaseScraper
+
+class SenewebScraper(BaseScraper):
+    def parse_articles(self, html):
+        soup = self.get_soup(html)
+        articles = []
+
+        containers = soup.select("li.post-aligned, li[class*='post']")
+
+        for item in containers[:15]:
+            try:
+                headline_tag = item.select_one("a")
+                if not headline_tag:
+                    continue
+                
+                headline = self.clean_text(headline_tag.get_text())
+                if len(headline) < 20:
+                    continue
+                    
+                url = headline_tag.get("href", "")
+                url = self.make_absolute_url(url)
+
+                summary = ""
+                summary_tag = item.select_one("p, .excerpt")
+                if summary_tag:
+                    summary = self.clean_text(summary_tag.get_text())
+
+                image = ""
+                img_tag = item.select_one("img")
+                if img_tag:
+                    image = img_tag.get("src") or ""
+                    if image.startswith("data:"):
+                        image = ""
+                    elif image:
+                        image = self.make_absolute_url(image)
+
+                if headline and len(headline) > 15:
+                    articles.append({
+                        "headline": headline,
+                        "summary": summary[:500],
+                        "url": url,
+                        "image": image
+                    })
+            except Exception:
+                continue
+
+        return articles
+
+============================================================
+FILE: .\scrapers\__init__.py
+============================================================
+
+
+============================================================
+FILE: .\utils\database.py
+============================================================
+import os
+from supabase import create_client
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+
+# Load .env file if it exists (for local development)
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+class Database:
+    def __init__(self):
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise Exception("SUPABASE_URL and SUPABASE_KEY must be set")
+        self.client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    
+    def get_active_sources(self):
+        """Get all active sources"""
+        result = self.client.table("sources").select("*").eq("is_active", True).execute()
+        return result.data if result.data else []
+    
+    def get_pending_content(self, country_code=None, language=None, niche=None, limit=10):
+        """Get pending content with optional filters"""
+        query = self.client.table("content").select("*").eq("status", "pending")
+        
+        if country_code and country_code != "Pan":
+            query = query.eq("country_code", country_code)
+        
+        if language:
+            query = query.eq("source_language", language)
+        
+        if niche:
+            query = query.eq("niche", niche)
+        
+        query = query.limit(limit)
+        result = query.execute()
+        
+        return result.data if result.data else []
+    
+    def get_current_schedule(self):
+        """Get schedule for current hour"""
+        current_hour = datetime.utcnow().hour
+        result = self.client.table("schedule").select("*").eq("hour_utc", current_hour).eq("is_active", True).execute()
+        return result.data[0] if result.data else None
+    
+    def get_full_schedule(self):
+        """Get full 24-hour schedule"""
+        result = self.client.table("schedule").select("*").order("hour_utc").execute()
+        return result.data if result.data else []
+    
+    def add_content(self, source_id, headline, summary, original_url, image_url, source_language, country, country_code, niche):
+        """Add new content to database"""
+        headline_hash = self.create_headline_hash(headline)
+        
+        if self.content_exists(headline_hash):
+            return False
+        
+        if self.url_exists(original_url):
+            return False
+        
+        data = {
+            "source_id": source_id,
+            "headline": headline,
+            "summary": summary,
+            "original_url": original_url,
+            "image_url": image_url,
+            "source_language": source_language,
+            "country": country,
+            "country_code": country_code,
+            "niche": niche,
+            "status": "pending",
+            "headline_hash": headline_hash
+        }
+        
+        try:
+            self.client.table("content").insert(data).execute()
+            return True
+        except:
+            return False
+    
+    def content_exists(self, headline_hash):
+        """Check if content already exists"""
+        result = self.client.table("content").select("id").eq("headline_hash", headline_hash).execute()
+        return len(result.data) > 0 if result.data else False
+    
+    def url_exists(self, url):
+        """Check if content with same URL already exists"""
+        if not url:
+            return False
+        result = self.client.table("content").select("id").eq("original_url", url).execute()
+        return len(result.data) > 0 if result.data else False
+    
+    def create_headline_hash(self, headline):
+        """Create hash of headline for duplicate detection"""
+        import hashlib
+        normalized = " ".join(headline.lower().split())
+        return hashlib.sha256(normalized.encode()).hexdigest()
+    
+    def mark_content_posted(self, content_id):
+        """Mark content as posted"""
+        self.client.table("content").update({
+            "status": "posted"
+        }).eq("id", content_id).execute()
+    
+    def mark_content_failed(self, content_id):
+        """Mark content as failed"""
+        self.client.table("content").update({"status": "failed"}).eq("id", content_id).execute()
+    
+    def is_content_posted(self, content_id):
+        """Check if content has already been posted"""
+        result = self.client.table("content").select("status").eq("id", content_id).execute()
+        if result.data:
+            return result.data[0].get("status") == "posted"
+        return False
+    
+    def create_post(self, content_id, post_text, post_language, target_country, niche, image_used, facebook_post_id):
+        """Create a post record"""
+        if self.is_content_posted(content_id):
+            return False
+        
+        data = {
+            "content_id": content_id,
+            "post_text": post_text,
+            "post_language": post_language,
+            "target_country": target_country,
+            "niche": niche,
+            "image_used": image_used,
+            "facebook_post_id": facebook_post_id,
+            "posted_at": datetime.utcnow().isoformat()
+        }
+        
+        self.client.table("posts").insert(data).execute()
+        return True
+    
+    def get_recent_posts(self, limit=10):
+        """Get recent posts"""
+        result = self.client.table("posts").select("*").order("posted_at", desc=True).limit(limit).execute()
+        return result.data if result.data else []
+    
+    def get_language_ratio(self, hours=24):
+        """Get current language ratio for specified hours"""
+        cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+        
+        result = self.client.table("posts").select("post_language").gte("posted_at", cutoff).execute()
+        posts = result.data if result.data else []
+        
+        french = sum(1 for p in posts if p.get("post_language") == "french")
+        english = sum(1 for p in posts if p.get("post_language") == "english")
+        total = french + english
+        
+        french_ratio = french / total if total > 0 else 0.7
+        english_ratio = english / total if total > 0 else 0.3
+        
+        return {
+            "french": french,
+            "english": english,
+            "total": total,
+            "french_ratio": french_ratio,
+            "english_ratio": english_ratio,
+            "french_pct": french_ratio * 100,
+            "english_pct": english_ratio * 100
+        }
+    
+    def update_source_scraped(self, source_id):
+        """Update last scraped timestamp for source"""
+        self.client.table("sources").update({
+            "last_scraped": datetime.utcnow().isoformat()
+        }).eq("id", source_id).execute()
+    
+    def get_sources_needing_scrape(self, hours=4):
+        """Get sources that need scraping"""
+        cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+        
+        result = self.client.table("sources").select("*").eq("is_active", True).or_(
+            f"last_scraped.is.null,last_scraped.lt.{cutoff}"
+        ).execute()
+        
+        return result.data if result.data else []
+
+============================================================
+FILE: .\utils\fb_analytics.py
+============================================================
+import os
+import requests
+from datetime import datetime, timedelta
+from utils.database import Database
+from utils.logger import log_info, log_error, log_success, log_warning
+
+class FacebookAnalytics:
+    """Fetch and analyze Facebook post performance"""
+    
+    def __init__(self):
+        self.access_token = os.getenv("FB_ACCESS_TOKEN", "")
+        self.page_id = os.getenv("FB_PAGE_ID", "")
+        self.db = Database()
+        self.base_url = "https://graph.facebook.com/v18.0"
+    
+    def get_post_insights(self, post_id):
+        """Fetch insights for a specific post"""
+        try:
+            # Get basic post metrics
+            url = f"{self.base_url}/{post_id}"
+            params = {
+                "fields": "id,message,created_time,shares,likes.summary(true),comments.summary(true)",
+                "access_token": self.access_token
+            }
+            
+            response = requests.get(url, params=params, timeout=15)
+            
+            if response.status_code != 200:
+                log_warning(f"Failed to get post {post_id}: {response.status_code}")
+                return None
+            
+            data = response.json()
+            
+            # Get post insights (reach, impressions, engagement)
+            insights_url = f"{self.base_url}/{post_id}/insights"
+            insights_params = {
+                "metric": "post_impressions,post_impressions_unique,post_engaged_users,post_clicks",
+                "access_token": self.access_token
+            }
+            
+            insights_response = requests.get(insights_url, params=insights_params, timeout=15)
+            
+            insights = {}
+            if insights_response.status_code == 200:
+                insights_data = insights_response.json()
+                for item in insights_data.get("data", []):
+                    metric_name = item.get("name", "")
+                    values = item.get("values", [])
+                    if values:
+                        insights[metric_name] = values[0].get("value", 0)
+            
+            return {
+                "post_id": post_id,
+                "likes": data.get("likes", {}).get("summary", {}).get("total_count", 0),
+                "comments": data.get("comments", {}).get("summary", {}).get("total_count", 0),
+                "shares": data.get("shares", {}).get("count", 0) if data.get("shares") else 0,
+                "impressions": insights.get("post_impressions", 0),
+                "reach": insights.get("post_impressions_unique", 0),
+                "engagements": insights.get("post_engaged_users", 0),
+                "clicks": insights.get("post_clicks", 0),
+            }
+            
+        except Exception as e:
+            log_error(f"Error fetching insights for {post_id}: {e}")
+            return None
+    
+    def update_post_metrics(self, post_id, content_id):
+        """Update metrics for a post in database"""
+        insights = self.get_post_insights(post_id)
+        
+        if not insights:
+            return False
+        
+        try:
+            self.db.client.table("posts").update({
+                "reach": insights.get("reach", 0),
+                "impressions": insights.get("impressions", 0),
+                "engagements": insights.get("engagements", 0),
+                "reactions": insights.get("likes", 0),
+                "comments": insights.get("comments", 0),
+                "shares": insights.get("shares", 0),
+                "metrics_updated_at": datetime.utcnow().isoformat()
+            }).eq("facebook_post_id", post_id).execute()
+            
+            return True
+        except Exception as e:
+            log_error(f"Error updating metrics: {e}")
+            return False
+    
+    def update_all_recent_posts(self, hours=24):
+        """Update metrics for all posts from last N hours"""
+        try:
+            cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+            
+            result = self.db.client.table("posts").select(
+                "id, facebook_post_id, content_id"
+            ).gte("posted_at", cutoff).execute()
+            
+            posts = result.data if result.data else []
+            
+            log_info(f"Updating metrics for {len(posts)} posts...")
+            
+            updated = 0
+            for post in posts:
+                fb_post_id = post.get("facebook_post_id")
+                if fb_post_id:
+                    success = self.update_post_metrics(fb_post_id, post.get("content_id"))
+                    if success:
+                        updated += 1
+            
+            log_success(f"Updated metrics for {updated}/{len(posts)} posts")
+            return updated
+            
+        except Exception as e:
+            log_error(f"Error updating recent posts: {e}")
+            return 0
+    
+    def get_performance_report(self, days=7):
+        """Generate performance report for last N days"""
+        try:
+            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            
+            result = self.db.client.table("posts").select(
+                "id, post_language, target_country, niche, reach, impressions, engagements, reactions, comments, shares, posted_at"
+            ).gte("posted_at", cutoff).execute()
+            
+            posts = result.data if result.data else []
+            
+            if not posts:
+                return "No posts in the last {days} days"
+            
+            # Aggregate by language
+            lang_stats = {}
+            for post in posts:
+                lang = post.get("post_language", "unknown")
+                if lang not in lang_stats:
+                    lang_stats[lang] = {"posts": 0, "reach": 0, "engagements": 0}
+                lang_stats[lang]["posts"] += 1
+                lang_stats[lang]["reach"] += post.get("reach", 0) or 0
+                lang_stats[lang]["engagements"] += post.get("engagements", 0) or 0
+            
+            # Aggregate by country
+            country_stats = {}
+            for post in posts:
+                country = post.get("target_country", "unknown")
+                if country not in country_stats:
+                    country_stats[country] = {"posts": 0, "reach": 0, "engagements": 0}
+                country_stats[country]["posts"] += 1
+                country_stats[country]["reach"] += post.get("reach", 0) or 0
+                country_stats[country]["engagements"] += post.get("engagements", 0) or 0
+            
+            # Aggregate by niche
+            niche_stats = {}
+            for post in posts:
+                niche = post.get("niche", "unknown")
+                if niche not in niche_stats:
+                    niche_stats[niche] = {"posts": 0, "reach": 0, "engagements": 0}
+                niche_stats[niche]["posts"] += 1
+                niche_stats[niche]["reach"] += post.get("reach", 0) or 0
+                niche_stats[niche]["engagements"] += post.get("engagements", 0) or 0
+            
+            # Calculate totals
+            total_reach = sum(p.get("reach", 0) or 0 for p in posts)
+            total_engagements = sum(p.get("engagements", 0) or 0 for p in posts)
+            total_reactions = sum(p.get("reactions", 0) or 0 for p in posts)
+            total_comments = sum(p.get("comments", 0) or 0 for p in posts)
+            total_shares = sum(p.get("shares", 0) or 0 for p in posts)
+            
+            report = {
+                "period_days": days,
+                "total_posts": len(posts),
+                "total_reach": total_reach,
+                "total_engagements": total_engagements,
+                "total_reactions": total_reactions,
+                "total_comments": total_comments,
+                "total_shares": total_shares,
+                "avg_reach_per_post": total_reach // len(posts) if posts else 0,
+                "avg_engagements_per_post": total_engagements // len(posts) if posts else 0,
+                "by_language": lang_stats,
+                "by_country": dict(sorted(country_stats.items(), key=lambda x: x[1]["reach"], reverse=True)[:10]),
+                "by_niche": niche_stats,
+            }
+            
+            return report
+            
+        except Exception as e:
+            log_error(f"Error generating report: {e}")
+            return None
+    
+    def get_best_performing_content(self, days=7, limit=10):
+        """Get top performing posts"""
+        try:
+            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            
+            result = self.db.client.table("posts").select(
+                "id, post_text, post_language, target_country, niche, reach, engagements, reactions, comments, shares, posted_at"
+            ).gte("posted_at", cutoff).order("reach", desc=True).limit(limit).execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            log_error(f"Error getting best content: {e}")
+            return []
+    
+    def print_report(self, days=7):
+        """Print formatted performance report"""
+        report = self.get_performance_report(days)
+        
+        if not report or isinstance(report, str):
+            print(report or "No data available")
+            return
+        
+        print("="*60)
+        print(f"PERFORMANCE REPORT - Last {days} Days")
+        print("="*60)
+        
+        print(f"\n📊 OVERVIEW:")
+        print(f"   Total Posts: {report['total_posts']}")
+        print(f"   Total Reach: {report['total_reach']:,}")
+        print(f"   Total Engagements: {report['total_engagements']:,}")
+        print(f"   Avg Reach/Post: {report['avg_reach_per_post']:,}")
+        print(f"   Reactions: {report['total_reactions']:,} | Comments: {report['total_comments']:,} | Shares: {report['total_shares']:,}")
+        
+        print(f"\n🌍 BY LANGUAGE:")
+        for lang, stats in report['by_language'].items():
+            avg_reach = stats['reach'] // stats['posts'] if stats['posts'] else 0
+            print(f"   {lang.upper()}: {stats['posts']} posts, {stats['reach']:,} reach, {avg_reach:,} avg")
+        
+        print(f"\n🗺️  TOP COUNTRIES:")
+        for country, stats in list(report['by_country'].items())[:5]:
+            avg_reach = stats['reach'] // stats['posts'] if stats['posts'] else 0
+            print(f"   {country}: {stats['posts']} posts, {stats['reach']:,} reach, {avg_reach:,} avg")
+        
+        print(f"\n📰 BY NICHE:")
+        for niche, stats in report['by_niche'].items():
+            avg_reach = stats['reach'] // stats['posts'] if stats['posts'] else 0
+            print(f"   {niche}: {stats['posts']} posts, {stats['reach']:,} reach, {avg_reach:,} avg")
+        
+        print("\n" + "="*60)
+
+
+fb_analytics = FacebookAnalytics()
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    analytics = FacebookAnalytics()
+    
+    print("Testing Facebook Analytics...")
+    print()
+    
+    # Update recent posts
+    analytics.update_all_recent_posts(hours=48)
+    
+    # Print report
+    analytics.print_report(days=7)
+
+============================================================
+FILE: .\utils\freshness_filter.py
+============================================================
+import re
+from datetime import datetime, timedelta
+from dateutil import parser as date_parser
+
+class FreshnessFilter:
+    """Filter articles to ensure they are recent (within last 48 hours)"""
+    
+    def __init__(self, max_age_hours=48):
+        self.max_age_hours = max_age_hours
+        self.cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
+    
+    def is_fresh(self, article):
+        """Check if article is within the freshness window"""
+        
+        # Check published_at field (from APIs)
+        published_at = article.get("published_at", "")
+        if published_at:
+            try:
+                pub_date = date_parser.parse(published_at)
+                if pub_date.tzinfo:
+                    pub_date = pub_date.replace(tzinfo=None)
+                return pub_date >= self.cutoff_time
+            except:
+                pass
+        
+        # Check URL for date patterns
+        url = article.get("url", "")
+        date_from_url = self.extract_date_from_url(url)
+        if date_from_url:
+            return date_from_url >= self.cutoff_time.date()
+        
+        # Check headline/summary for date indicators
+        headline = article.get("headline", "").lower()
+        summary = article.get("summary", "").lower()
+        text = headline + " " + summary
+        
+        fresh_indicators = ["today", "aujourd'hui", "breaking", "just in", "vient de", "ce matin", "this morning"]
+        if any(indicator in text for indicator in fresh_indicators):
+            return True
+        
+        stale_indicators = ["last year", "l'an dernier", "2023", "2022", "2021", "2020"]
+        if any(indicator in text for indicator in stale_indicators):
+            return False
+        
+        return True
+    
+    def extract_date_from_url(self, url):
+        """Extract date from URL patterns"""
+        patterns = [
+            r'/(\d{4})/(\d{2})/(\d{2})/',
+            r'/(\d{4})-(\d{2})-(\d{2})/',
+            r'/(\d{4})(\d{2})(\d{2})/',
+            r'-(\d{4})(\d{2})(\d{2})',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                try:
+                    year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                    if 2020 <= year <= 2030 and 1 <= month <= 12 and 1 <= day <= 31:
+                        return datetime(year, month, day).date()
+                except:
+                    pass
+        
+        return None
+    
+    def filter_articles(self, articles, verbose=False):
+        """Filter list of articles to only fresh ones"""
+        fresh = []
+        stale = 0
+        
+        for article in articles:
+            if self.is_fresh(article):
+                fresh.append(article)
+            else:
+                stale += 1
+        
+        if verbose and stale > 0:
+            print(f"Filtered out {stale} stale articles, kept {len(fresh)} fresh")
+        
+        return fresh
+
+
+if __name__ == "__main__":
+    filter = FreshnessFilter(max_age_hours=48)
+    
+    test_articles = [
+        {"headline": "Breaking news today", "url": "https://example.com/2025/12/28/article", "published_at": ""},
+        {"headline": "Old news from 2023", "url": "https://example.com/2023/01/15/article", "published_at": ""},
+        {"headline": "Recent update", "url": "https://example.com/article", "published_at": "2025-12-28T10:00:00Z"},
+        {"headline": "Something happened", "url": "https://example.com/old", "published_at": "2025-01-01T10:00:00Z"},
+    ]
+    
+    print("Testing Freshness Filter")
+    print("="*50)
+    print(f"Cutoff time: {filter.cutoff_time}")
+    
+    for article in test_articles:
+        is_fresh = filter.is_fresh(article)
+        status = "FRESH" if is_fresh else "STALE"
+        print(f"\n{status}: {article['headline'][:40]}...")
+        print(f"  URL date: {filter.extract_date_from_url(article['url'])}")
+        print(f"  Published: {article.get('published_at', 'N/A')}")
+
+============================================================
+FILE: .\utils\http_helper.py
+============================================================
+import requests
+import os
+import tempfile
+from bs4 import BeautifulSoup
+from utils.logger import log_warning
+
+# Default headers that work for most sites
+DEFAULT_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+}
+
+# Sites that need Googlebot header
+GOOGLEBOT_SITES = [
+    'addisstandard.com',
+]
+
+GOOGLEBOT_HEADERS = {
+    'User-Agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)',
+}
+
+def get_headers_for_url(url):
+    """Get appropriate headers for a URL"""
+    for site in GOOGLEBOT_SITES:
+        if site in url:
+            return GOOGLEBOT_HEADERS
+    return DEFAULT_HEADERS
+
+def fetch_page(url, timeout=15, max_retries=3):
+    """Fetch a web page with appropriate headers"""
+    headers = get_headers_for_url(url)
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(
+                url, 
+                headers=headers, 
+                timeout=timeout, 
+                allow_redirects=True
+            )
+            
+            if response.status_code == 200:
+                return response.text
+            elif response.status_code == 403:
+                log_warning(f"Access denied (403) for {url}")
+                return None
+            else:
+                log_warning(f"HTTP {response.status_code} for {url}")
+                return None
+                
+        except requests.exceptions.Timeout:
+            log_warning(f"Timeout fetching {url} (attempt {attempt}/{max_retries})")
+        except requests.exceptions.ConnectionError:
+            log_warning(f"Connection error fetching {url} (attempt {attempt}/{max_retries})")
+        except Exception as e:
+            log_warning(f"Error fetching {url}: {e}")
+            return None
+    
+    return None
+
+def download_image(url, timeout=10):
+    """Download an image and return the local file path"""
+    if not url:
+        return None
+    
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        }
+        
+        response = requests.get(url, headers=headers, timeout=timeout, stream=True)
+        
+        if response.status_code != 200:
+            log_warning(f"Failed to download image: HTTP {response.status_code}")
+            return None
+        
+        # Determine file extension
+        content_type = response.headers.get('content-type', '')
+        if 'jpeg' in content_type or 'jpg' in content_type:
+            ext = '.jpg'
+        elif 'png' in content_type:
+            ext = '.png'
+        elif 'gif' in content_type:
+            ext = '.gif'
+        elif 'webp' in content_type:
+            ext = '.webp'
+        else:
+            ext = '.jpg'  # Default
+        
+        # Create temp file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                temp_file.write(chunk)
+        
+        temp_file.close()
+        return temp_file.name
+        
+    except Exception as e:
+        log_warning(f"Error downloading image {url}: {e}")
+        return None
+
+def extract_og_image(html):
+    """Extract Open Graph image from HTML"""
+    try:
+        soup = BeautifulSoup(html, "lxml")
+        
+        # Try og:image first
+        og_image = soup.select_one('meta[property="og:image"]')
+        if og_image:
+            return og_image.get("content", "")
+        
+        # Try twitter:image
+        twitter_image = soup.select_one('meta[name="twitter:image"]')
+        if twitter_image:
+            return twitter_image.get("content", "")
+        
+        return ""
+    except Exception:
+        return ""
+
+def extract_meta_description(html):
+    """Extract meta description from HTML"""
+    try:
+        soup = BeautifulSoup(html, "lxml")
+        
+        # Try og:description first
+        og_desc = soup.select_one('meta[property="og:description"]')
+        if og_desc:
+            return og_desc.get("content", "")
+        
+        # Try regular meta description
+        meta_desc = soup.select_one('meta[name="description"]')
+        if meta_desc:
+            return meta_desc.get("content", "")
+        
+        return ""
+    except Exception:
+        return ""
+
+============================================================
+FILE: .\utils\image_finder.py
+============================================================
+import requests
+from config.settings import PEXELS_API_KEY, UNSPLASH_ACCESS_KEY
+from utils.logger import log_error, log_info
+
+def get_stock_image(query):
+    """
+    Search Pexels or Unsplash for a relevant stock image based on query.
+    Returns URL of proper aspect ratio image or None.
+    """
+    if not query:
+        return None
+        
+    # Try Pexels first (high quality, good search)
+    if PEXELS_API_KEY and "your_pexels_key" not in Pexels_API_KEY:
+        try:
+            url = "https://api.pexels.com/v1/search"
+            headers = {"Authorization": PEXELS_API_KEY}
+            params = {"query": query, "per_page": 1, "orientation": "landscape"}
+            
+            resp = requests.get(url, headers=headers, params=params, timeout=5)
+            data = resp.json()
+            
+            if "photos" in data and len(data["photos"]) > 0:
+                # Prefer 'large2x' or 'landscape'
+                return data["photos"][0]["src"]["large2x"]
+        except Exception as e:
+            log_error(f"Pexels search failed: {e}")
+
+    # Fallback to Unsplash (if key exists)
+    if UNSPLASH_ACCESS_KEY and "your_unsplash_key" not in Unsplash_ACCESS_KEY:
+        try:
+            url = "https://api.unsplash.com/search/photos"
+            headers = {"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"}
+            params = {"query": query, "per_page": 1, "orientation": "landscape"}
+            
+            resp = requests.get(url, headers=headers, params=params, timeout=5)
+            data = resp.json()
+            
+            if "results" in data and len(data["results"]) > 0:
+                return data["results"][0]["urls"]["regular"]
+        except Exception as e:
+            log_error(f"Unsplash search failed: {e}")
+
+    return None
+
+
+============================================================
+FILE: .\utils\logger.py
+============================================================
+import os
+from datetime import datetime
+
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+
+def ensure_log_dir():
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+
+def log(message, level="INFO"):
+    ensure_log_dir()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_line = f"[{timestamp}] [{level}] {message}"
+    print(log_line)
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    log_file = os.path.join(LOG_DIR, f"{date_str}.log")
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(log_line + "\n")
+
+def log_info(message):
+    log(message, "INFO")
+
+def log_error(message):
+    log(message, "ERROR")
+
+def log_warning(message):
+    log(message, "WARNING")
+
+def log_success(message):
+    log(message, "SUCCESS")
+
+def log_scrape(source_name, articles_count):
+    log(f"Scraped {articles_count} articles from {source_name}", "SCRAPE")
+
+def log_post(country, language, niche):
+    log(f"Posted: {country} | {language} | {niche}", "POST")
+
+============================================================
+FILE: .\utils\__init__.py
+============================================================
