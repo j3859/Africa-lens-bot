@@ -23,6 +23,7 @@ class Database:
     
     def get_pending_content(self, country_code=None, language=None, niche=None, limit=10):
         """Get pending content with optional filters"""
+        # Only select items strictly marked as 'pending'
         query = self.client.table("content").select("*").eq("status", "pending")
         
         if country_code and country_code != "Pan":
@@ -52,6 +53,12 @@ class Database:
     
     def add_content(self, source_id, headline, summary, original_url, image_url, source_language, country, country_code, niche):
         """Add new content to database"""
+        
+        # --- STRICT CHECK: REJECT CONTENT WITHOUT IMAGES ---
+        if not image_url or str(image_url).strip() == "":
+            return False
+        # ---------------------------------------------------
+
         headline_hash = self.create_headline_hash(headline)
         
         if self.content_exists(headline_hash):
@@ -71,7 +78,8 @@ class Database:
             "country_code": country_code,
             "niche": niche,
             "status": "pending",
-            "headline_hash": headline_hash
+            "headline_hash": headline_hash,
+            "created_at": datetime.utcnow().isoformat() # Ensure created_at is explicit for cleanup
         }
         
         try:
@@ -121,7 +129,7 @@ class Database:
     def is_image_used(self, image_url):
         """Check if this specific image URL has been used in a previous post"""
         if not image_url:
-            return True # Treat empty as used to avoid using it
+            return True 
             
         result = self.client.table("posts").select("id").eq("image_used", image_url).execute()
         return len(result.data) > 0 if result.data else False
@@ -189,3 +197,22 @@ class Database:
         ).execute()
         
         return result.data if result.data else []
+
+    def cleanup_old_content(self, hours=48):
+        """Delete content older than X hours that hasn't been posted"""
+        cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+        
+        # We delete anything OLDER than cutoff that is NOT 'posted'
+        # This keeps our history for image uniqueness, but cleans up the junk (failed, skipped, pending-forever)
+        try:
+            result = self.client.table("content").delete()\
+                .lt("created_at", cutoff)\
+                .neq("status", "posted")\
+                .execute()
+            
+            # Return count of deleted items
+            count = len(result.data) if result.data else 0
+            return count
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+            return 0
