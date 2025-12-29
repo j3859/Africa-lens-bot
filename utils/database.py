@@ -2,6 +2,7 @@ import os
 from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+import hashlib
 
 # Load .env file if it exists (for local development)
 load_dotenv()
@@ -93,7 +94,6 @@ class Database:
     
     def create_headline_hash(self, headline):
         """Create hash of headline for duplicate detection"""
-        import hashlib
         normalized = " ".join(headline.lower().split())
         return hashlib.sha256(normalized.encode()).hexdigest()
     
@@ -106,6 +106,10 @@ class Database:
     def mark_content_failed(self, content_id):
         """Mark content as failed"""
         self.client.table("content").update({"status": "failed"}).eq("id", content_id).execute()
+
+    def mark_content_skipped_image(self, content_id):
+        """Mark content as skipped due to invalid/missing image"""
+        self.client.table("content").update({"status": "skipped_no_image"}).eq("id", content_id).execute()
     
     def is_content_posted(self, content_id):
         """Check if content has already been posted"""
@@ -113,6 +117,14 @@ class Database:
         if result.data:
             return result.data[0].get("status") == "posted"
         return False
+    
+    def is_image_used(self, image_url):
+        """Check if this specific image URL has been used in a previous post"""
+        if not image_url:
+            return True # Treat empty as used to avoid using it
+            
+        result = self.client.table("posts").select("id").eq("image_used", image_url).execute()
+        return len(result.data) > 0 if result.data else False
     
     def create_post(self, content_id, post_text, post_language, target_country, niche, image_used, facebook_post_id):
         """Create a post record"""
