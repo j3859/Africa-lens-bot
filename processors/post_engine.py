@@ -2,7 +2,7 @@ from utils.database import Database
 from processors.ai_processor import ai_processor
 from processors.facebook_poster import fb_poster
 from processors.content_selector import content_selector
-from utils.logger import log_info, log_error, log_success
+from utils.logger import log_info, log_error, log_success, log_warning
 
 class PostEngine:
     def __init__(self):
@@ -46,6 +46,11 @@ class PostEngine:
                 log_info("No suitable content found")
                 return False
             
+            # Double-check content hasn't been posted already
+            if self.db.is_content_posted(content['id']):
+                log_warning(f"Content {content['id']} already posted, skipping")
+                return False
+            
             country = content.get('country', 'Pan-African')
             niche = content.get('niche', 'politics')
             
@@ -71,13 +76,13 @@ class PostEngine:
             # Get image URL
             image_url = content.get('image_url', '')
             
+            # Mark content as posted BEFORE posting to prevent duplicates
+            self.db.mark_content_posted(content['id'])
+            
             # Post to Facebook with country and niche for fallback images
             post_result = self.fb.post(post_text, image_url, country=country, niche=niche)
             
             if post_result:
-                # Mark content as posted
-                self.db.mark_content_posted(content['id'])
-                
                 # Save to posts table
                 self.db.create_post(
                     content_id=content['id'],
@@ -90,9 +95,10 @@ class PostEngine:
                 )
                 
                 log_success(f"Post cycle completed successfully")
-                
                 return True
             else:
+                # If posting failed, mark content as failed (not pending)
+                self.db.mark_content_failed(content['id'])
                 log_error("Failed to post to Facebook")
                 return False
                 

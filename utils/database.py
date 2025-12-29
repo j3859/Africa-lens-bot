@@ -56,6 +56,9 @@ class Database:
         if self.content_exists(headline_hash):
             return False
         
+        if self.url_exists(original_url):
+            return False
+        
         data = {
             "source_id": source_id,
             "headline": headline,
@@ -81,21 +84,41 @@ class Database:
         result = self.client.table("content").select("id").eq("headline_hash", headline_hash).execute()
         return len(result.data) > 0 if result.data else False
     
+    def url_exists(self, url):
+        """Check if content with same URL already exists"""
+        if not url:
+            return False
+        result = self.client.table("content").select("id").eq("original_url", url).execute()
+        return len(result.data) > 0 if result.data else False
+    
     def create_headline_hash(self, headline):
         """Create hash of headline for duplicate detection"""
         import hashlib
-        return hashlib.sha256(headline.encode()).hexdigest()
+        normalized = " ".join(headline.lower().split())
+        return hashlib.sha256(normalized.encode()).hexdigest()
     
     def mark_content_posted(self, content_id):
         """Mark content as posted"""
-        self.client.table("content").update({"status": "posted"}).eq("id", content_id).execute()
+        self.client.table("content").update({
+            "status": "posted"
+        }).eq("id", content_id).execute()
     
     def mark_content_failed(self, content_id):
         """Mark content as failed"""
         self.client.table("content").update({"status": "failed"}).eq("id", content_id).execute()
     
+    def is_content_posted(self, content_id):
+        """Check if content has already been posted"""
+        result = self.client.table("content").select("status").eq("id", content_id).execute()
+        if result.data:
+            return result.data[0].get("status") == "posted"
+        return False
+    
     def create_post(self, content_id, post_text, post_language, target_country, niche, image_used, facebook_post_id):
         """Create a post record"""
+        if self.is_content_posted(content_id):
+            return False
+        
         data = {
             "content_id": content_id,
             "post_text": post_text,
@@ -108,6 +131,7 @@ class Database:
         }
         
         self.client.table("posts").insert(data).execute()
+        return True
     
     def get_recent_posts(self, limit=10):
         """Get recent posts"""
