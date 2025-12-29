@@ -11,7 +11,7 @@ class PostEngine:
         self.ai = ai_processor
         self.fb = fb_poster
         self.selector = content_selector
-        self.MAX_RETRIES = 5  # How many articles to check for valid images before giving up
+        self.MAX_RETRIES = 20  # How many articles to check for valid images before giving up
 
     def run_single_post(self, schedule=None):
         """Run a single post cycle with retries for valid images"""
