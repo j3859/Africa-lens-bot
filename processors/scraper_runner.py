@@ -6,36 +6,129 @@ from utils.http_helper import fetch_page, extract_og_image
 from utils.freshness_filter import FreshnessFilter
 from utils.logger import log_info, log_error, log_success, log_warning
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 class ScraperRunner:
     def __init__(self):
-        self.db = Database()
-        self.freshness_filter = FreshnessFilter(max_age_hours=48)
-        
-        # API source names that don't need HTML fetching
-        self.api_sources = ["GNews", "YouTube", "NewsAPI", "Google Trends"]
-        
-        # Stats for the current run
-        self.stats = {
-            'total_articles': 0,
-            'saved_articles': 0,
-            'skipped_no_image': 0,
-            'skipped_other': 0,
-            'errors': 0
-        }
-    
+        try:
+            self.db = Database()
+            self.freshness_filter = FreshnessFilter(max_age_hours=48)
+            self.api_sources = ["GNews", "YouTube", "NewsAPI", "Google Trends"]
+            self.stats = {
+                'total_articles': 0,
+                'saved_articles': 0,
+                'skipped_no_image': 0,
+                'skipped_other': 0,
+                'errors': 0
+            }
+            log_info("ScraperRunner initialized successfully")
+        except Exception as e:
+            log_error(f"Failed to initialize ScraperRunner: {e}")
+            raise
+
+    def _process_image_url(self, url, article_url):
+        """Helper to process and validate image URLs"""
+        if not url:
+            return None
+            
+        try:
+            # Make relative URLs absolute
+            if url.startswith('//'):
+                url = 'https:' + url
+            elif url.startswith('/'):
+                parsed_uri = urlparse(article_url)
+                url = f"{parsed_uri.scheme}://{parsed_uri.netloc}{url}"
+                
+            # Skip placeholder or invalid images
+            if any(x in url.lower() for x in ['logo', 'icon', 'placeholder', 'sprite']):
+                return None
+                
+            return url
+        except Exception as e:
+            log_error(f"Error processing image URL {url}: {e}")
+            return None
+
+    def _extract_article_image(self, soup, article_url):
+        """Extract image from article content"""
+        try:
+            # Try common image containers
+            selectors = [
+                'article img[src*="."]',
+                '.article-content img[src*="."]',
+                'main img[src*="."]',
+                'figure img[src*="."]',
+                '.post-thumbnail img[src*="."]'
+            ]
+            
+            for selector in selectors:
+                try:
+                    img = soup.select_one(selector)
+                    if img:
+                        src = img.get('src') or img.get('data-src', '')
+                        if src:
+                            processed_url = self._process_image_url(src, article_url)
+                            if processed_url:
+                                return processed_url
+                except Exception as e:
+                    log_error(f"Error with selector {selector}: {e}")
+                    continue
+                    
+        except Exception as e:
+            log_error(f"Error extracting article image: {e}")
+            
+        return None
+
+    def _save_article(self, source, article, image_url):
+        """Helper method to save article to database"""
+        try:
+            headline = article.get("headline", "").strip()
+            summary = article.get("summary", "").strip()
+            url = article.get("url", "").strip()
+            
+            if not all([headline, url]):
+                log_warning("Skipping article - missing required fields (headline/URL)")
+                self.stats['skipped_other'] += 1
+                return False
+
+            # Save to database
+            success = self.db.add_content(
+                source_id=source["id"],
+                headline=headline,
+                summary=summary,
+                original_url=url,
+                image_url=image_url,
+                source_language=article.get("language", source.get("language", "en")),
+                country=article.get("country", source.get("country", "")),
+                country_code=article.get("country_code", source.get("country_code", "")),
+                niche=article.get("niche", source.get("niche", "general"))
+            )
+            
+            if success:
+                self.stats['saved_articles'] += 1
+                log_info(f"Saved article: {headline[:50]}...")
+            else:
+                log_warning(f"Failed to save article (possible duplicate): {headline[:50]}...")
+                self.stats['skipped_other'] += 1
+                
+            return success
+            
+        except Exception as e:
+            log_error(f"Error saving article: {e}")
+            self.stats['errors'] += 1
+            return False
+
     def run_single_source(self, source):
         """Run scraper for a single source"""
+        source_name = source.get("name", "Unknown")
+        log_info(f"Processing source: {source_name}")
+        
+        if source_name == "Reddit":
+            return 0
+            
         try:
-            source_name = source.get("name", "Unknown")
-            
-            # Skip Reddit if still in database
-            if source_name == "Reddit":
-                return 0
-            
             scraper = get_scraper(source)
             
-            # For API scrapers, call parse_articles without HTML
+            # Get articles
             if source_name in self.api_sources or source.get("source_type") == "api":
                 try:
                     articles = scraper.parse_articles(None)
@@ -43,7 +136,6 @@ class ScraperRunner:
                     log_warning(f"API scraper {source_name} failed: {e}")
                     return 0
             else:
-                # Web scrapers need HTML
                 html = fetch_page(source["url"])
                 if not html:
                     log_warning(f"Failed to fetch {source_name}")
@@ -51,171 +143,114 @@ class ScraperRunner:
                 articles = scraper.parse_articles(html)
             
             if not articles:
+                log_warning(f"No articles found for {source_name}")
                 return 0
             
             # Apply freshness filter
             fresh_articles = self.freshness_filter.filter_articles(articles)
+            log_info(f"Found {len(articles)} total articles, {len(fresh_articles)} fresh articles")
             
             if not fresh_articles:
+                log_info(f"No fresh articles for {source_name}")
                 return 0
-            
-            # Save to database
+             
+            # Process and save articles
             saved = 0
             for article in fresh_articles:
                 try:
-                    headline = article.get("headline", "")
-                    summary = article.get("summary", "")
-                    url = article.get("url", "")
-                    # First try to get the initial image from the article data
-                    image_url = article.get("image", "")
+                    headline = article.get("headline", "").strip()
+                    url = article.get("url", "").strip()
                     
-                    # If no image found in initial data, try to fetch the article page for OpenGraph image
-                    if not image_url or str(image_url).strip() == "":
-                        log_warning(f"No initial image found for article: {headline[:50]}...")
-                        if url and not any(x in url.lower() for x in ['#', 'mailto:', 'tel:']):
-                            try:
-                                log_info(f"Fetching article page for image: {url}")
-                                html = fetch_page(url)
-                                if html:
-                                    # First try OpenGraph image
-                                    og_image = extract_og_image(html)
-                                    if og_image and not any(x in og_image.lower() for x in ['logo', 'icon']):
-                                        image_url = og_image
-                                        log_info(f"Found OpenGraph image: {og_image}")
-                                    else:
-                                        # If no OpenGraph, try to find a suitable image in the article
-                                        soup = BeautifulSoup(html, 'lxml')
-                                        article_img = soup.select_one('article img[src*="."]') or \
-                                                    soup.select_one('.article-content img[src*="."]') or \
-                                                    soup.select_one('main img[src*="."]')
-                                        
-                                        if article_img:
-                                            src = article_img.get('src') or article_img.get('data-src', '')
-                                            if src and not any(x in src.lower() for x in ['logo', 'icon']):
-                                                # Make relative URLs absolute
-                                                if src.startswith('//'):
-                                                    src = 'https:' + src
-                                                elif src.startswith('/'):
-                                                    from urllib.parse import urlparse
-                                                    parsed_uri = urlparse(url)
-                                                    src = f"{parsed_uri.scheme}://{parsed_uri.netloc}{src}"
-                                                image_url = src
-                                                log_info(f"Found article image: {image_url}")
-                                        
-                                        if not image_url:
-                                            log_warning(f"No suitable image found for {url}")
-                                            self.stats['skipped_no_image'] += 1
-                                            continue
-                                else:
-                                    log_warning(f"Failed to fetch article page: {url}")
-                                    self.stats['skipped_other'] += 1
-                                    continue
-                            except Exception as e:
-                                log_error(f"Error processing article page: {e}")
-                                self.stats['errors'] += 1
-                                continue
-                        else:
-                            log_warning(f"Invalid or missing URL for article: {headline[:50]}...")
-                            self.stats['skipped_other'] += 1
-                            continue
-                    else:
-                        log_info(f"Found initial image: {image_url}")
-
-                    success = self.db.add_content(
-                        source_id=source["id"],
-                        headline=headline,
-                        summary=summary,
-                        original_url=url,
-                        image_url=image_url,
-                        source_language=article.get("language", source["language"]),
-                        country=article.get("country", source["country"]),
-                        country_code=article.get("country_code", source["country_code"]),
-                        niche=article.get("niche", source["niche"])
-                    )
-                    if success:
+                    if not all([headline, url]):
+                        log_warning("Skipping article - missing required fields (headline/URL)")
+                        self.stats['skipped_other'] += 1
+                        continue
+                    
+                    # Process image
+                    image_url = article.get("image", "").strip()
+                    if not image_url:
+                        log_info(f"Fetching article page for image: {url[:100]}...")
+                        try:
+                            html = fetch_page(url)
+                            if html:
+                                # Try OpenGraph first
+                                image_url = extract_og_image(html)
+                                if not image_url:
+                                    # Fall back to content image
+                                    soup = BeautifulSoup(html, 'lxml')
+                                    image_url = self._extract_article_image(soup, url)
+                        except Exception as e:
+                            log_error(f"Error fetching article page: {e}")
+                    
+                    if not image_url:
+                        log_warning(f"Skipping article - no valid image found: {headline[:50]}...")
+                        self.stats['skipped_no_image'] += 1
+                        continue
+                    
+                    # Save the article
+                    if self._save_article(source, article, image_url):
                         saved += 1
+                        
                 except Exception as e:
-                    # Log specific errors here to debug DB issues
-                    import traceback
-                    error_details = traceback.format_exc()
-                    log_error(f"Error saving article from {source_name}: {e}\n{error_details}")
+                    log_error(f"Error processing article: {e}")
+                    self.stats['errors'] += 1
                     continue
             
             if saved > 0:
                 log_success(f"{source_name}: Saved {saved} articles")
-            
-            # Update last_scraped timestamp
-            self.db.update_source_scraped(source["id"])
+                try:
+                    self.db.update_source_scraped(source["id"])
+                except Exception as e:
+                    log_error(f"Error updating last_scraped for {source_name}: {e}")
             
             return saved
             
         except Exception as e:
-            log_error(f"Error scraping {source.get('name', 'Unknown')}: {e}")
+            log_error(f"Error in {source_name}: {e}")
+            self.stats['errors'] += 1
             return 0
-    
+
     def run_all(self):
         """Run all active scrapers"""
         log_info("Starting scraper run...")
-        self.stats = {
-            'total_articles': 0,
-            'saved_articles': 0,
-            'skipped_no_image': 0,
-            'skipped_other': 0,
-            'errors': 0
-        }
+        start_time = time.time()
+        self.stats = {k: 0 for k in self.stats}
         
-        sources = self.db.get_active_sources()
-        log_info(f"Found {len(sources)} active sources")
-        
-        if not sources:
-            log_warning("No active sources found")
+        try:
+            sources = self.db.get_active_sources()
+            if not sources:
+                log_warning("No active sources found")
+                return 0
+                
+            log_info(f"Found {len(sources)} active sources")
+            total_saved = 0
+            
+            for source in sources:
+                try:
+                    saved = self.run_single_source(source)
+                    total_saved += saved
+                    self.stats['total_articles'] += saved
+                    time.sleep(2)  # Be nice to servers
+                except Exception as e:
+                    log_error(f"Error running source: {e}")
+                    self.stats['errors'] += 1
+            
+            # Log final stats
+            run_time = time.time() - start_time
+            log_info("\n=== Scraper Run Summary ===")
+            log_info(f"Total articles processed: {self.stats['total_articles']}")
+            log_info(f"Articles saved: {self.stats['saved_articles']}")
+            log_info(f"Skipped - no image: {self.stats['skipped_no_image']}")
+            log_info(f"Skipped - other reasons: {self.stats['skipped_other']}")
+            log_info(f"Errors: {self.stats['errors']}")
+            log_info(f"Run time: {run_time:.2f} seconds")
+            log_info("===========================\n")
+            
+            return total_saved
+            
+        except Exception as e:
+            log_error(f"Fatal error in scraper run: {e}")
             return 0
-        
-        log_info(f"Running {len(sources)} scrapers...")
-        
-        total_saved = 0
-        successful = 0
-        failed = 0
-        
-        for source in sources:
-            try:
-                saved = self.run_single_source(source)
-                self.stats['total_articles'] += saved
-                if saved > 0:
-                    successful += 1
-                else:
-                    failed += 1
-                # Add a small delay between sources to be nice to the servers
-                time.sleep(2)
-            except Exception as e:
-                log_error(f"Error running {source.get('name', 'Unknown')}: {e}")
-                failed += 1
-        
-        # Log final stats
-        log_info("\n=== Scraper Run Statistics ===")
-        log_info(f"Total articles processed: {self.stats['total_articles']}")
-        log_info(f"Articles saved: {self.stats['saved_articles']}")
-        log_info(f"Skipped (no image): {self.stats['skipped_no_image']}")
-        log_info(f"Skipped (other reasons): {self.stats['skipped_other']}")
-        log_info(f"Errors: {self.stats['errors']}")
-        log_info("============================\n")
-        
-        log_info(f"Scraper run complete: {successful} successful, {failed} failed, {self.db.get_pending_content_count()} articles saved")
-        
-        return total_saved
-    
-    def run_priority_sources(self):
-        """Run only high-priority sources (for quick updates)"""
-        log_info("Running priority sources...")
-        
-        sources = self.db.get_active_sources()
-        priority_sources = [s for s in sources if s.get("priority", 2) == 1]
-        
-        total_saved = 0
-        for source in priority_sources:
-            saved = self.run_single_source(source)
-            total_saved += saved
-        
-        return total_saved
 
+# Create a global instance of the ScraperRunner
 scraper_runner = ScraperRunner()
