@@ -3,6 +3,7 @@ from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import hashlib
+from utils.logger import log_info, log_warning, log_error
 
 # Load .env file if it exists (for local development)
 load_dotenv()
@@ -56,15 +57,18 @@ class Database:
         
         # --- STRICT CHECK: REJECT CONTENT WITHOUT IMAGES ---
         if not image_url or str(image_url).strip() == "":
+            log_warning(f"Rejected article - No image URL provided for: {headline[:50]}...")
             return False
         # ---------------------------------------------------
 
         headline_hash = self.create_headline_hash(headline)
         
         if self.content_exists(headline_hash):
+            log_warning(f"Rejected article - Duplicate headline: {headline[:50]}...")
             return False
         
         if self.url_exists(original_url):
+            log_warning(f"Rejected article - Duplicate URL: {original_url}")
             return False
         
         data = {
@@ -79,13 +83,15 @@ class Database:
             "niche": niche,
             "status": "pending",
             "headline_hash": headline_hash,
-            "created_at": datetime.utcnow().isoformat() # Ensure created_at is explicit for cleanup
+            "created_at": datetime.utcnow().isoformat()
         }
         
         try:
-            self.client.table("content").insert(data).execute()
+            result = self.client.table("content").insert(data).execute()
+            log_info(f"Successfully inserted article into database: {headline[:50]}...")
             return True
-        except:
+        except Exception as e:
+            log_error(f"Database error while inserting article: {e}")
             return False
     
     def content_exists(self, headline_hash):

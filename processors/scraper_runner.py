@@ -90,6 +90,10 @@ class ScraperRunner:
                 self.stats['skipped_other'] += 1
                 return False
 
+            # Log the article being processed
+            log_info(f"Attempting to save article: {headline[:50]}...")
+            log_info(f"Image URL: {image_url}")
+
             # Save to database
             success = self.db.add_content(
                 source_id=source["id"],
@@ -105,9 +109,9 @@ class ScraperRunner:
             
             if success:
                 self.stats['saved_articles'] += 1
-                log_info(f"Saved article: {headline[:50]}...")
+                log_success(f"Successfully saved article: {headline[:50]}...")
             else:
-                log_warning(f"Failed to save article (possible duplicate): {headline[:50]}...")
+                log_warning(f"Failed to save article (possible duplicate or database error): {headline[:50]}...")
                 self.stats['skipped_other'] += 1
                 
             return success
