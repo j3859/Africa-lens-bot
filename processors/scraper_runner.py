@@ -212,8 +212,8 @@ class ScraperRunner:
 
     def run_all(self):
         """Run all active scrapers"""
-        log_info("Starting scraper run...")
         start_time = time.time()
+        log_info("Starting scraper run...")
         self.stats = {k: 0 for k in self.stats}
         
         try:
@@ -224,26 +224,36 @@ class ScraperRunner:
                 
             log_info(f"Found {len(sources)} active sources")
             total_saved = 0
+            successful = 0
+            failed = 0
             
             for source in sources:
                 try:
                     saved = self.run_single_source(source)
-                    total_saved += saved
-                    self.stats['total_articles'] += saved
+                    if saved is not None:
+                        successful += 1 if saved > 0 else 0
+                        failed += 1 if saved == 0 else 0
+                        total_saved += saved
                     time.sleep(2)  # Be nice to servers
                 except Exception as e:
                     log_error(f"Error running source: {e}")
+                    failed += 1
                     self.stats['errors'] += 1
-            
+
+            # Get pending count safely
+            pending_content = self.db.get_pending_content()
+            pending_count = len(pending_content) if pending_content else 0
+
             # Log final stats
             run_time = time.time() - start_time
             log_info("\n=== Scraper Run Summary ===")
-            log_info(f"Total articles processed: {self.stats['total_articles']}")
+            log_info(f"Total articles processed: {self.stats['saved_articles'] + self.stats['skipped_no_image'] + self.stats['skipped_other']}")
             log_info(f"Articles saved: {self.stats['saved_articles']}")
             log_info(f"Skipped - no image: {self.stats['skipped_no_image']}")
             log_info(f"Skipped - other reasons: {self.stats['skipped_other']}")
             log_info(f"Errors: {self.stats['errors']}")
             log_info(f"Run time: {run_time:.2f} seconds")
+            log_info(f"Pending articles in queue: {pending_count}")
             log_info("===========================\n")
             
             return total_saved
