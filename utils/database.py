@@ -52,8 +52,8 @@ class Database:
         result = self.client.table("schedule").select("*").order("hour_utc").execute()
         return result.data if result.data else []
     
-    def add_content(self, source_id, headline, summary, original_url, image_url, source_language, country, country_code, niche):
-        """Add new content to database"""
+    def add_content(self, source_id, headline, summary, original_url, image_url, source_language, country, country_code, niche, initial_image_url=None):
+        """Add new content to database with initial image URL"""
         
         # --- STRICT CHECK: REJECT CONTENT WITHOUT IMAGES ---
         if not image_url or str(image_url).strip() == "":
@@ -77,6 +77,7 @@ class Database:
             "summary": summary,
             "original_url": original_url,
             "image_url": image_url,
+            "initial_image_url": initial_image_url or image_url,  # Fallback to image_url if not provided
             "source_language": source_language,
             "country": country,
             "country_code": country_code,

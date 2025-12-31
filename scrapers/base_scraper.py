@@ -47,7 +47,7 @@ class GenericScraper(ABC):
             articles = [link for link in links if len(link.get_text(strip=True)) > 50]
             
         return articles or []
-    
+
     def scrape(self):
         """Default implementation of the scrape method"""
         log_info(f"Scraping {self.name} (using generic scraper)...")
@@ -91,6 +91,9 @@ class BaseScraper(GenericScraper):
             if db.content_exists(article.get("headline", "")):
                 continue
 
+            # Store the initial image URL before any processing
+            initial_image = article.get("image", "")
+            
             # Fetch full article details (text + high-res image)
             full_text, og_image = self.fetch_full_details(article.get("url", ""))
             
@@ -98,16 +101,22 @@ class BaseScraper(GenericScraper):
             final_summary = full_text if full_text and len(full_text) > 200 else article.get("summary", "")
             
             # Use OG image if list-page image is missing/broken
-            final_image = article.get("image", "")
+            final_image = initial_image  # Start with the initial image
             if (not final_image or "base64" in final_image) and og_image:
                 final_image = og_image
             
-            # LAST RESORT: Stock Image Fallback
-            if not final_image or "base64" in final_image:
-                stock_img = get_stock_image(article.get("headline", ""))
+            # LAST RESORT: Stock Image Fallback - Use article-specific stock image
+            if not final_image or "base64" in final_image or any(domain in str(final_image).lower() for domain in ["cdn.tuko.co.ke", "placeholder", "default", "logo", "icon"]):
+                # Create a unique query using headline and URL to ensure different images
+                unique_query = f"{article.get('headline', '')} {article.get('url', '')}"
+                stock_img = get_stock_image(unique_query)
                 if stock_img:
                     final_image = stock_img
-                    log_info(f"Using stock image for: {article.get('headline')[:20]}...")
+                    log_info(f"Using unique stock image for: {article.get('headline')[:20]}...")
+                else:
+                    log_warning(f"No suitable image found for: {article.get('headline')[:20]}...")
+                    self.mark_article_skipped(article.get("url"), "no_suitable_image")
+                    continue  # Skip this article if no image is found
 
             result = db.add_content(
                 source_id=self.source_id,
@@ -115,6 +124,7 @@ class BaseScraper(GenericScraper):
                 summary=final_summary, 
                 original_url=article.get("url", ""),
                 image_url=final_image,
+                initial_image_url=initial_image,  # Pass the initial image URL
                 source_language=self.language,
                 country=self.country,
                 country_code=self.country_code,
@@ -129,6 +139,10 @@ class BaseScraper(GenericScraper):
         db.update_source_scraped(self.source_id)
         log_scrape(self.name, saved_count)
         return saved_count
+
+    def mark_article_skipped(self, url, reason):
+        """Mark an article as skipped with a reason"""
+        log_warning(f"Article skipped - {reason}: {url}")
 
     def fetch_full_details(self, url):
         """Fetches full text and og:image from the article URL."""

@@ -11,13 +11,14 @@ def get_stock_image(query):
         return None
         
     # Try Pexels first (high quality, good search)
-    if PEXELS_API_KEY and "your_pexels_key" not in Pexels_API_KEY:
+    if PEXELS_API_KEY and PEXELS_API_KEY != "your_pexels_key_here":
         try:
             url = "https://api.pexels.com/v1/search"
             headers = {"Authorization": PEXELS_API_KEY}
             params = {"query": query, "per_page": 1, "orientation": "landscape"}
             
             resp = requests.get(url, headers=headers, params=params, timeout=5)
+            resp.raise_for_status()
             data = resp.json()
             
             if "photos" in data and len(data["photos"]) > 0:
@@ -27,18 +28,21 @@ def get_stock_image(query):
             log_error(f"Pexels search failed: {e}")
 
     # Fallback to Unsplash (if key exists)
-    if UNSPLASH_ACCESS_KEY and "your_unsplash_key" not in Unsplash_ACCESS_KEY:
+    if UNSPLASH_ACCESS_KEY and UNSPLASH_ACCESS_KEY != "your_unsplash_key_here":
         try:
             url = "https://api.unsplash.com/search/photos"
             headers = {"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"}
             params = {"query": query, "per_page": 1, "orientation": "landscape"}
             
             resp = requests.get(url, headers=headers, params=params, timeout=5)
+            resp.raise_for_status()
             data = resp.json()
             
             if "results" in data and len(data["results"]) > 0:
                 return data["results"][0]["urls"]["regular"]
         except Exception as e:
             log_error(f"Unsplash search failed: {e}")
+    
+    log_warning(f"No stock image found for query: {query}")
 
     return None
