@@ -1,3 +1,5 @@
+import sys
+import os
 import schedule
 import time
 from datetime import datetime
@@ -54,6 +56,17 @@ class AfricaLensBot:
         log_info("Running scrapers...")
         self.scraper.run_all()
     
+    def run_cleanup(self, hours=48):
+        """Clean up old content"""
+        log_info(f"Cleaning up content older than {hours} hours...")
+        try:
+            count = self.db.cleanup_old_content(hours=hours)
+            log_success(f"Cleanup complete. Removed {count} old records.")
+            return count
+        except Exception as e:
+            log_error(f"Error during cleanup: {e}")
+            return 0
+    
     def update_analytics(self):
         """Update analytics for recent posts"""
         log_info("Updating analytics...")
@@ -76,6 +89,9 @@ class AfricaLensBot:
         # Schedule scraping every 3 hours
         schedule.every(3).hours.do(self.run_scrape)
         
+        # Schedule cleanup daily at 3 AM UTC
+        schedule.every().day.at("03:00").do(lambda: self.run_cleanup(hours=48))
+        
         # Schedule analytics update every 6 hours
         schedule.every(6).hours.do(self.update_analytics)
         
@@ -85,8 +101,9 @@ class AfricaLensBot:
         # Schedule weekly report on Sundays
         schedule.every().sunday.at("12:00").do(self.reporter.send_weekly_report)
         
-        # Run initial scrape
+        # Run initial tasks
         self.run_scrape()
+        self.run_cleanup()  # Run cleanup on startup
         
         log_info("Bot running. Press Ctrl+C to stop.")
         
@@ -102,14 +119,19 @@ class AfricaLensBot:
                 self.reporter.send_error_alert(str(e))
                 time.sleep(300)
 
-
 if __name__ == "__main__":
-    import sys
-    
     bot = AfricaLensBot()
     
     if len(sys.argv) < 2:
-        print("Usage: python main.py [status|post|scrape|run|report|analytics]")
+        print("Usage: python main.py [status|post|scrape|run|report|analytics|cleanup]")
+        print("\nCommands:")
+        print("  status    - Show current bot status")
+        print("  post      - Run a single post cycle")
+        print("  scrape    - Run all scrapers")
+        print("  cleanup   - Clean up old content (48h by default)")
+        print("  run       - Run in continuous mode")
+        print("  report    - Send daily report")
+        print("  analytics - Show analytics report")
         sys.exit(1)
     
     command = sys.argv[1].lower()
@@ -120,6 +142,9 @@ if __name__ == "__main__":
         bot.run_once()
     elif command == "scrape":
         bot.run_scrape()
+    elif command == "cleanup":
+        hours = int(sys.argv[2]) if len(sys.argv) > 2 else 48
+        bot.run_cleanup(hours=hours)
     elif command == "run":
         bot.run_continuous()
     elif command == "report":
@@ -129,4 +154,4 @@ if __name__ == "__main__":
         bot.show_analytics()
     else:
         print(f"Unknown command: {command}")
-        print("Available: status, post, scrape, run, report, analytics")
+        print("Available commands: status, post, scrape, cleanup, run, report, analytics")

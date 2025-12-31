@@ -209,17 +209,52 @@ class Database:
         """Delete content older than X hours that hasn't been posted"""
         cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
         
-        # We delete anything OLDER than cutoff that is NOT 'posted'
-        # This keeps our history for image uniqueness, but cleans up the junk (failed, skipped, pending-forever)
         try:
-            result = self.client.table("content").delete()\
+            # First, get the count of items to be deleted for logging
+            count_result = self.client.table("content")\
+                .select("id", count="exact")\
                 .lt("created_at", cutoff)\
                 .neq("status", "posted")\
                 .execute()
             
-            # Return count of deleted items
-            count = len(result.data) if result.data else 0
+            count = count_result.count if hasattr(count_result, 'count') else 0
+            
+            if count > 0:
+                log_info(f"Cleaning up {count} old content items (older than {hours} hours)")
+                
+                # Now perform the actual deletion
+                result = self.client.table("content")\
+                    .delete()\
+                    .lt("created_at", cutoff)\
+                    .neq("status", "posted")\
+                    .execute()
+                
+                log_info(f"Successfully deleted {count} old content items")
+            else:
+                log_info("No old content items to clean up")
+                
             return count
+            
         except Exception as e:
-            print(f"Cleanup error: {e}")
+            log_error(f"Error during content cleanup: {e}")
+            return 0
+
+    def clear_all_content(self):
+        """Delete all content from the database. Use with caution!"""
+        try:
+            # First get count for logging
+            count_result = self.client.table("content").select("id", count="exact").execute()
+            total_count = count_result.count if hasattr(count_result, 'count') else 0
+            
+            if total_count > 0:
+                log_warning(f"Deleting ALL {total_count} content items from database")
+                result = self.client.table("content").delete().neq("id", 0).execute()
+                log_warning(f"Successfully deleted {total_count} content items")
+                return total_count
+            else:
+                log_info("No content items to delete")
+                return 0
+                
+        except Exception as e:
+            log_error(f"Error clearing content table: {e}")
             return 0
